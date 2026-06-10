@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Ambientes Virtuais
+.env
+.venv
+env/
+venv/
+
+# Dados e Modelos (Estes serão rastreados pelo DVC, não pelo Git)
+/data/*
+!/data/.keep
+/models/*
+!/models/.keep
+
+# Configurações de IDE
+.vscode/
+.idea/
