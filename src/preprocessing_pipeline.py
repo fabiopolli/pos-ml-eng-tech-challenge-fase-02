@@ -29,29 +29,83 @@ class OlistDataLoader:
         """
         self.dataset_path: str = dataset_path
 
+    def _fix_csv_files(self) -> None:
+        """Corrige problemas comuns de encoding e caracteres especiais nos arquivos CSV.
+        
+        Alguns arquivos podem ter caracteres de controle ou encoding incorreto no header.
+        Este método limpa automaticamente esses problemas.
+        """
+        csv_files = [
+            'olist_order_payments_dataset.csv',
+            'olist_customers_dataset.csv',
+            'olist_order_items_dataset.csv',
+            'olist_order_reviews_dataset.csv',
+            'olist_orders_dataset.csv',
+            'olist_products_dataset.csv',
+            'olist_sellers_dataset.csv',
+            'product_category_name_translation.csv'
+        ]
+        
+        for filename in csv_files:
+            filepath = f"{self.dataset_path}/{filename}"
+            try:
+                df = pd.read_csv(filepath)
+                # Limpar nomes de colunas: remover caracteres estranhos e aspas
+                cols_fixed = [
+                    col.replace('Reload Window', '')
+                       .strip('"')
+                       .strip()
+                    for col in df.columns
+                ]
+                
+                # Se houver mudanças, salvar o arquivo corrigido
+                if cols_fixed != df.columns.tolist():
+                    df.columns = cols_fixed
+                    df.to_csv(filepath, index=False)
+                    print(f"   [INFO] Arquivo '{filename}' foi corrigido automaticamente")
+            except Exception as e:
+                print(f"   [AVISO] Não foi possível validar '{filename}': {e}")
+
     def load_all_data(self) -> pd.DataFrame:
         """Carrega e une todos os arquivos CSV da Olist.
 
         Returns:
             DataFrame unificado contendo os dados de clientes, pedidos e avaliações.
+        
+        Raises:
+            FileNotFoundError: Se algum arquivo CSV não for encontrado.
+            KeyError: Se colunas esperadas estiverem faltando.
         """
-        customers: pd.DataFrame = pd.read_csv(f"{self.dataset_path}/olist_customers_dataset.csv")
-        order_items: pd.DataFrame = pd.read_csv(f"{self.dataset_path}/olist_order_items_dataset.csv")
-        order_payments: pd.DataFrame = pd.read_csv(f"{self.dataset_path}/olist_order_payments_dataset.csv")
-        order_reviews: pd.DataFrame = pd.read_csv(f"{self.dataset_path}/olist_order_reviews_dataset.csv")
-        orders: pd.DataFrame = pd.read_csv(f"{self.dataset_path}/olist_orders_dataset.csv")
-        products: pd.DataFrame = pd.read_csv(f"{self.dataset_path}/olist_products_dataset.csv")
-        sellers: pd.DataFrame = pd.read_csv(f"{self.dataset_path}/olist_sellers_dataset.csv")
-        category_translation: pd.DataFrame = pd.read_csv(f"{self.dataset_path}/product_category_name_translation.csv")
+        # Corrigir problemas de encoding nos arquivos CSV
+        self._fix_csv_files()
+        
+        try:
+            customers: pd.DataFrame = pd.read_csv(f"{self.dataset_path}/olist_customers_dataset.csv")
+            order_items: pd.DataFrame = pd.read_csv(f"{self.dataset_path}/olist_order_items_dataset.csv")
+            order_payments: pd.DataFrame = pd.read_csv(f"{self.dataset_path}/olist_order_payments_dataset.csv")
+            order_reviews: pd.DataFrame = pd.read_csv(f"{self.dataset_path}/olist_order_reviews_dataset.csv")
+            orders: pd.DataFrame = pd.read_csv(f"{self.dataset_path}/olist_orders_dataset.csv")
+            products: pd.DataFrame = pd.read_csv(f"{self.dataset_path}/olist_products_dataset.csv")
+            sellers: pd.DataFrame = pd.read_csv(f"{self.dataset_path}/olist_sellers_dataset.csv")
+            category_translation: pd.DataFrame = pd.read_csv(f"{self.dataset_path}/product_category_name_translation.csv")
+        except FileNotFoundError as e:
+            raise FileNotFoundError(f"Arquivo CSV não encontrado em {self.dataset_path}: {e}")
 
-        # União dos conjuntos de dados
-        df: pd.DataFrame = orders.merge(order_items, on='order_id', how='left')
-        df = df.merge(order_payments, on='order_id', how='outer', validate='m:m')
-        df = df.merge(order_reviews, on='order_id', how='outer')
-        df = df.merge(products, on='product_id', how='outer')
-        df = df.merge(customers, on='customer_id', how='outer')
-        df = df.merge(sellers, on='seller_id', how='outer')
-        df = df.merge(category_translation, on='product_category_name', how='left')
+        # União dos conjuntos de dados com detalhes de erro
+        try:
+            df: pd.DataFrame = orders.merge(order_items, on='order_id', how='left')
+            df = df.merge(order_payments, on='order_id', how='outer', validate='m:m')
+            df = df.merge(order_reviews, on='order_id', how='outer')
+            df = df.merge(products, on='product_id', how='outer')
+            df = df.merge(customers, on='customer_id', how='outer')
+            df = df.merge(sellers, on='seller_id', how='outer')
+            df = df.merge(category_translation, on='product_category_name', how='left')
+            
+        except KeyError as e:
+            raise KeyError(
+                f"Coluna não encontrada durante merge do arquivo {self.dataset_path}. "
+                f"Coluna esperada: {e}. Verifique a integridade dos arquivos CSV."
+            )
 
         return df
 

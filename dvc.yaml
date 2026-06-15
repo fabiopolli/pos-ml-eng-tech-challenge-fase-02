@@ -1,0 +1,41 @@
+stages:
+  prepare:
+    cmd: python src/data_preparation.py
+    deps:
+      - src/data_preparation.py
+      - src/preprocessing_pipeline.py
+      - data/olist_customers_dataset.csv
+      - data/olist_order_items_dataset.csv
+      - data/olist_order_payments_dataset.csv
+      - data/olist_order_reviews_dataset.csv
+      - data/olist_orders_dataset.csv
+      - data/olist_products_dataset.csv
+      - data/olist_sellers_dataset.csv
+      - data/product_category_name_translation.csv
+    outs:
+      - data/processed:
+          cache: true
+    desc: "Estágio 1: Carrega, limpa e pré-processa os dados brutos do Olist"
+
+  train:
+    cmd: python src/model_training.py
+    deps:
+      - src/model_training.py
+      - src/baseline_models.py
+      - data/processed
+    outs:
+      - models:
+          cache: true
+    desc: "Estágio 2: Treina todos os modelos baseline e compara performance"
+
+  evaluate:
+    cmd: python src/model_evaluation.py
+    deps:
+      - src/model_evaluation.py
+      - src/baseline_models.py
+      - data/processed
+      - models
+    outs:
+      - artifacts:
+          cache: false
+    desc: "Estágio 3: Avalia os modelos e gera visualizações e relatórios finais"

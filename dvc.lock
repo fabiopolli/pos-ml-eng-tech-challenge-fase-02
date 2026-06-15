@@ -1,0 +1,51 @@
+schema: '2.0'
+stages:
+  prepare:
+    cmd: python src/data_preparation.py
+    deps:
+    - path: data/olist_customers_dataset.csv
+      hash: md5
+      md5: 8a2c4244856aab4bde3b8ed81f8ca251
+      size: 9033957
+    - path: data/olist_order_items_dataset.csv
+      hash: md5
+      md5: f4fa76976662e9cba0633f9e49ed2645
+      size: 15438671
+    - path: data/olist_order_payments_dataset.csv
+      hash: md5
+      md5: d7aaceca670b76770e73286f99f3edfc
+      size: 5737249
+    - path: data/olist_order_reviews_dataset.csv
+      hash: md5
+      md5: 914066be00d2db0c3d857f071cff1688
+      size: 14451670
+    - path: data/olist_orders_dataset.csv
+      hash: md5
+      md5: 8bd60e55c1ca229d9f70b62f3e72f22c
+      size: 17654914
+    - path: data/olist_products_dataset.csv
+      hash: md5
+      md5: e935401104a3669223b83c9a01fdf5ca
+      size: 2379446
+    - path: data/olist_sellers_dataset.csv
+      hash: md5
+      md5: 5b22c02facdf842d6c0aea36e1849018
+      size: 174703
+    - path: data/product_category_name_translation.csv
+      hash: md5
+      md5: 4196d142e8f2b9697521fc50c97f626b
+      size: 2613
+    - path: src/data_preparation.py
+      hash: md5
+      md5: bb5f9e688869fde8cb1eab668dbc0d3e
+      size: 2123
+    - path: src/preprocessing_pipeline.py
+      hash: md5
+      md5: fe49917918900c126f8dec8a573e9053
+      size: 18704
+    outs:
+    - path: data/processed
+      hash: md5
+      md5: 441d8de39762526715d4b5c8568b4826.dir
+      size: 55574394
+      nfiles: 5

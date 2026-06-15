@@ -45,7 +45,7 @@ class ModelFactory:
         model_type_lower = model_type.lower().replace(" ", "_")
 
         if model_type_lower == "logistic_regression":
-            params = {"max_iter": 1000, "random_state": 42, "multi_class": "ovr"}
+            params = {"max_iter": 1000, "random_state": 42}
             params.update(kwargs)
             return LogisticRegression(**params)
 
