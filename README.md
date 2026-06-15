@@ -17,10 +17,10 @@ Abaixo está o cronograma macro e o painel de evolução do projeto. Os respons�
 
 ### 📅 Fase 2: Engenharia de Dados e Versionamento (14/06 a 20/06)
 **Responsáveis:** Denis & Romário
-- [ ] Homologar um dataset de interações de e-commerce que atenda ao requisito mínimo estabelecido de 10.000 interações do tipo *user-item*.
-- [ ] Desenvolver os pipelines de pré-processamento e os modelos preditivos base (*baselines*) utilizando o framework Scikit-Learn.
-- [ ] Inicializar a ferramenta DVC para o controle de versão massivo de dados, configurando adequadamente o repositório remoto.
-- [ ] Construir o pipeline de dados automatizado no arquivo `dvc.yaml`, contemplando no mínimo três estágios lógicos e sequenciais.
+- [x] Homologar um dataset de interações de e-commerce que atenda ao requisito mínimo estabelecido de 10.000 interações do tipo *user-item*.
+- [x] Desenvolver os pipelines de pré-processamento e os modelos preditivos base (*baselines*) utilizando o framework Scikit-Learn.
+- [x] Inicializar a ferramenta DVC para o controle de versão massivo de dados, configurando adequadamente o repositório remoto.
+- [x] Construir o pipeline de dados automatizado no arquivo `dvc.yaml`, contemplando no mínimo três estágios lógicos e sequenciais.
 
 ### 📅 Fase 3: Ciência de Dados e Modelagem de IA (21/06 a 27/06)
 **Responsáveis:** A definir

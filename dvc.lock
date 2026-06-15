@@ -49,3 +49,52 @@ stages:
       md5: 441d8de39762526715d4b5c8568b4826.dir
       size: 55574394
       nfiles: 5
+  train:
+    cmd: python src/model_training.py
+    deps:
+    - path: data/processed
+      hash: md5
+      md5: 441d8de39762526715d4b5c8568b4826.dir
+      size: 55574394
+      nfiles: 5
+    - path: src/baseline_models.py
+      hash: md5
+      md5: 70a3d3ea3e220146356bf83b6f3b8212
+      size: 13942
+    - path: src/model_training.py
+      hash: md5
+      md5: 6556b92b855edbe6dcb19ee9ff662a23
+      size: 3601
+    outs:
+    - path: models
+      hash: md5
+      md5: 313ffa7836cdd007d20fcdf8a0f0882d.dir
+      size: 12739813
+      nfiles: 10
+  evaluate:
+    cmd: python src/model_evaluation.py
+    deps:
+    - path: data/processed
+      hash: md5
+      md5: 441d8de39762526715d4b5c8568b4826.dir
+      size: 55574394
+      nfiles: 5
+    - path: models
+      hash: md5
+      md5: 313ffa7836cdd007d20fcdf8a0f0882d.dir
+      size: 12739813
+      nfiles: 10
+    - path: src/baseline_models.py
+      hash: md5
+      md5: 70a3d3ea3e220146356bf83b6f3b8212
+      size: 13942
+    - path: src/model_evaluation.py
+      hash: md5
+      md5: 440e963f9e891bfaff7ac0c513d67f68
+      size: 4310
+    outs:
+    - path: artifacts
+      hash: md5
+      md5: 8fbc7b591bbaa57230dd66f4ac206eba.dir
+      size: 354040
+      nfiles: 4
