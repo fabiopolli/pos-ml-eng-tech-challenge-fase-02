@@ -57,11 +57,14 @@ def train_models(data_dir: str = "data/processed", output_dir: str = "models") -
         with open(metrics_filename, 'w') as f:
             metrics = {
                 'accuracy': float(result['metrics']['accuracy']),
-                'precision': float(result['metrics']['precision']),
-                'recall': float(result['metrics']['recall']),
+                'precision_weighted': float(result['metrics']['precision_weighted']),
+                'recall_weighted': float(result['metrics']['recall_weighted']),
                 'f1_weighted': float(result['metrics']['f1_weighted']),
-                'cv_accuracy_mean': float(result['metrics']['cv_accuracy_mean']),
-                'cv_accuracy_std': float(result['metrics']['cv_accuracy_std'])
+                'precision_macro': float(result['metrics']['precision_macro']),
+                'recall_macro': float(result['metrics']['recall_macro']),
+                'f1_macro': float(result['metrics']['f1_macro']),
+                'cv_accuracy_mean': float(result['cv_results']['cv_mean']),
+                'cv_accuracy_std': float(result['cv_results']['cv_std'])
             }
             json.dump(metrics, f, indent=2)
     

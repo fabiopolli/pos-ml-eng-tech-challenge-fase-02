@@ -1,28 +1,30 @@
 # ⚡ Testes DVC - Guia Rápido
 
-## 🧪 4 Testes Principais (Copiar e Colar)
+## 🧪 5 Testes Principais (Copiar e Colar)
+
+**⚠️ Nota:** No PowerShell, use `python -m dvc` em vez de apenas `dvc`
 
 ### **Teste 1: Versão**
 ```bash
-dvc --version
+python -m dvc --version
 # Saída esperada: 3.67.1
 ```
 
 ### **Teste 2: Status**
 ```bash
-dvc status
+python -m dvc status
 # Saída esperada: Mostra quais estágios precisam rodar
 ```
 
 ### **Teste 3: Pipeline (DAG)**
 ```bash
-dvc dag
+python -m dvc dag
 # Saída esperada: prepare → train → evaluate
 ```
 
 ### **Teste 4: Remoto**
 ```bash
-dvc remote list
+python -m dvc remote list
 # Saída esperada: local_storage  C:\dvc_storage\pos-ml-eng-tech (default)
 ```
 

@@ -1,19 +1,21 @@
 # 🧪 5 Formas de Testar o DVC
 
+**⚠️ IMPORTANTE:** No PowerShell, use `python -m dvc` em vez de apenas `dvc`
+
 ## 1️⃣ **Teste Rápido: Verificar Configuração**
 
 ```bash
 # Ver versão
-dvc --version
+python -m dvc --version
 
 # Ver status do repositório
-dvc status
+python -m dvc status
 
 # Listar remoto
-dvc remote list
+python -m dvc remote list
 
 # Ver configuração
-dvc config -l
+python -m dvc config -l
 ```
 
 **Saída esperada:**
@@ -33,10 +35,10 @@ local_storage  C:\dvc_storage\pos-ml-eng-tech (default)
 
 ```bash
 # Ver DAG do pipeline
-dvc dag
+python -m dvc dag
 
 # Ver dependências de um estágio
-dvc dag --target train
+python -m dvc dag --target train
 ```
 
 **Saída esperada:**
@@ -86,22 +88,22 @@ python -m py_compile src/model_evaluation.py
 ### Opção A: Um Estágio por Vez
 ```bash
 # Rodar estágio 2
-dvc repro --single-stage train
+python -m dvc repro --single-stage train
 
 # Rodar estágio 3
-dvc repro --single-stage evaluate
+python -m dvc repro --single-stage evaluate
 ```
 
 ### Opção B: Todo o Pipeline
 ```bash
 # Rodar tudo de uma vez
-dvc repro
+python -m dvc repro
 ```
 
 ### Opção C: Forçar Re-execução
 ```bash
 # Re-executar mesmo se não mudou nada
-dvc repro --force
+python -m dvc repro --force
 ```
 
 **Tempo esperado:** 7-13 minutos
@@ -125,13 +127,13 @@ Updating lock file 'dvc.lock'
 
 ```bash
 # Enviar dados para repositório remoto
-dvc push
+python -m dvc push
 
 # Baixar dados do remoto
-dvc pull
+python -m dvc pull
 
 # Verificar o que vai ser enviado
-dvc status --cloud
+python -m dvc status --cloud
 ```
 
 **Saída esperada:**
@@ -170,22 +172,22 @@ python check_dvc_status.py
 ### Fase 1: Validação (2 min)
 ```bash
 # 1. Verificar versão
-dvc --version
+python -m dvc --version
 
 # 2. Ver configuração
-dvc remote list
+python -m dvc remote list
 
 # 3. Visualizar pipeline
-dvc dag
+python -m dvc dag
 
 # 4. Verificar status
-dvc status
+python -m dvc status
 ```
 
 ### Fase 2: Execução (7-13 min)
 ```bash
 # 5. Completar pipeline
-dvc repro
+python -m dvc repro
 ```
 
 ### Fase 3: Verificação (2 min)
@@ -194,7 +196,7 @@ dvc repro
 python check_dvc_status.py
 
 # 7. Sincronizar com remoto
-dvc push
+python -m dvc push
 
 # 8. Verificar dvc.lock
 cat dvc.lock | head -20
@@ -244,8 +246,8 @@ dvc remote add -d local_storage C:\dvc_storage\pos-ml-eng-tech
 
 ### Ver Logs Detalhados
 ```bash
-dvc repro -v  # Verbose mode
-dvc repro -vv # Extra verbose
+python -m dvc repro -v  # Verbose mode
+python -m dvc repro -vv # Extra verbose
 ```
 
 ---
