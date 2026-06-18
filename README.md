@@ -90,3 +90,26 @@ Sempre que puxar atualizações da branch `main` que envolvam novos datasets ou 
 ```bash
 dvc pull
 ```
+Este projeto utiliza o *DVC (Data Version Control)* para orquestrar o pipeline de dados e treinamento de modelos, garantindo a reprodutibilidade dos experimentos.
+
+A arquitetura do pipeline está definida no arquivo dvc.yaml e dividida nas seguintes etapas:
+1. *Preprocessamento*: Limpeza e preparação dos dados (src/preprocessing_pipeline.py).
+2. *Treinamento*: Treina os modelos Gradient Boosting e Logistic Regression, salvando os binários na pasta models/.
+3. *Avaliação*: Avalia a performance e gera matrizes de confusão e relatórios de métricas salvos na pasta artifacts/.
+
+### Rodando o Pipeline
+Para reproduzir o fluxo completo, certifique-se de ter as dependências instaladas e ative seu ambiente virtual. No terminal, execute:
+
+```bash
+# Executa o pipeline do DVC (apenas as etapas com modificações identificadas)
+dvc repro
+
+# Para forçar a execução de todas as etapas do zero, ignorando o cache
+dvc repro -f
+
+Comandos Úteis do DVC
+dvc status: Verifica se algum dado, script ou dependência foi alterado e precisa ser reprocessado.
+
+dvc dag: Exibe a árvore de dependências (DAG) do projeto diretamente no terminal.
+
+Nota para usuários de Windows: Caso enfrente problemas de permissão ao executar scripts auxiliares (como os localizados em scripts/), recomenda-se utilizar o Git Bash ou rodar o PowerShell como Administrador.
