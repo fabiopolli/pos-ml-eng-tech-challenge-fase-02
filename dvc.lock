@@ -1,0 +1,83 @@
+schema: '2.0'
+stages:
+  prepare:
+    cmd: poetry run python src/data_preparation.py
+    deps:
+    - path: data/raw/olist_customers_dataset.csv
+      hash: md5
+      md5: 8a2c4244856aab4bde3b8ed81f8ca251
+      size: 9033957
+    - path: data/raw/olist_order_items_dataset.csv
+      hash: md5
+      md5: f4fa76976662e9cba0633f9e49ed2645
+      size: 15438671
+    - path: data/raw/olist_order_payments_dataset.csv
+      hash: md5
+      md5: 75ce0c041d18e5f250c5cea9a8042944
+      size: 5777138
+    - path: data/raw/olist_order_reviews_dataset.csv
+      hash: md5
+      md5: 914066be00d2db0c3d857f071cff1688
+      size: 14451670
+    - path: data/raw/olist_orders_dataset.csv
+      hash: md5
+      md5: 8bd60e55c1ca229d9f70b62f3e72f22c
+      size: 17654914
+    - path: data/raw/olist_products_dataset.csv
+      hash: md5
+      md5: e935401104a3669223b83c9a01fdf5ca
+      size: 2379446
+    - path: data/raw/product_category_name_translation.csv
+      hash: md5
+      md5: 4196d142e8f2b9697521fc50c97f626b
+      size: 2613
+    - path: src/data_preparation.py
+      hash: md5
+      md5: a3d8b407f61647d21d83c277525ee71b
+      size: 9237
+    outs:
+    - path: data/processed/README.md
+      hash: md5
+      md5: 57b0bccbe58bf550f4ff3826e959a33a
+      size: 1617
+    - path: data/processed/interactions.parquet
+      hash: md5
+      md5: c0ebb24a636307b3da61df22c5fb7780
+      size: 5970239
+  featurize:
+    cmd: poetry run python src/feature_engineering.py
+    deps:
+    - path: data/processed/interactions.parquet
+      hash: md5
+      md5: c0ebb24a636307b3da61df22c5fb7780
+      size: 5970239
+    - path: src/feature_engineering.py
+      hash: md5
+      md5: 5dde2e2c956bc73286f57279d2a78e6b
+      size: 18175
+    outs:
+    - path: data/processed/FEATURES.md
+      hash: md5
+      md5: bdce7b0f9707d7a9ec73f0fdaf8ac29f
+      size: 2600
+    - path: data/processed/feature_metadata.json
+      hash: md5
+      md5: 026e42c537f1caa310a50aa902863c87
+      size: 1732
+    - path: data/processed/id_mappings.json
+      hash: md5
+      md5: d43cef6c9b8d5a29ec1a406ad959cd49
+      size: 5379246
+    - path: data/processed/interactions_fe.parquet
+      hash: md5
+      md5: 682343d6a6d8ef3c8e7d8959ddfe12e2
+      size: 8857934
+  validate:
+    cmd: "poetry run python -c \" import pandas as pd df = pd.read_parquet('data/processed/interactions_fe.parquet')
+      assert df.shape == (99785, 42), f'Wrong shape: {df.shape}' assert df['review_score'].isna().sum()
+      < 1000, 'Too many null reviews' print('Validation OK:', df.shape) \"\n"
+    deps:
+    - path: data/processed/interactions_fe.parquet
+      hash: md5
+      md5: 682343d6a6d8ef3c8e7d8959ddfe12e2
+      size: 8857934

@@ -1,3 +1,15 @@
-# Add patterns of files dvc should ignore, which could improve
-# the performance. Learn more at
-# https://dvc.org/doc/user-guide/dvcignore
+# Ignorar outputs intermediários
+*.tmp
+*.bak
+*.swp
+
+# Ignorar relatórios gerados
+reports/figures/*.tmp
+reports/*.tmp
+
+# Ignorar logs
+*.log
+
+# Ignorar caches do Python
+__pycache__/
+*.pyc

@@ -1,21 +1,96 @@
-# Python
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
-.pytest_cache/
 
-# Ambientes Virtuais
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
 .env
-.venv
+.venv/
 env/
 venv/
+ENV/
+env.bak/
+venv.bak/
 
-# Dados e Modelos (Estes serão rastreados pelo DVC, não pelo Git)
-/data/*
-!/data/.keep
-/models/*
-!/models/.keep
-
-# Configurações de IDE
-.vscode/
+# IDEs
 .idea/
+.vscode/
+*.swp
+*.swo
+
+# Testing
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.pytest_cache/
+.tox/
+.mypy_cache/
+.ruff_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+profile_default/
+
+# Logs
+*.log
+logs/
+
+# MLflow
+mlruns/
+mlartifacts/
+
+# DVC
+.dvc/cache/
+.dvc/tmp/
+.dvc/plots/
+dvc.lock
+
+# Models and data (versioned via DVC instead of Git)
+data/raw/*
+!data/raw/.gitkeep
+!data/raw/*.csv.dvc
+data/processed/*
+!data/processed/.gitkeep
+!data/processed/*.parquet.dvc
+models/*
+!models/.gitkeep
+
+# Large files
+*.parquet
+*.pkl
+*.joblib
+*.pt
+*.pth
+*.bin
+*.h5
+*.onnx
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment variables
+.env.local
+.env.*.local
