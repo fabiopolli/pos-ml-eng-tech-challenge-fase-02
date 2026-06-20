@@ -1,2 +1,4 @@
 [core]
     no_scm = true
+['remote "origin"']
+    url = https://dagshub.com/romagrinho/pos-ml-eng-tech-challenge-fase-02.dvc
