@@ -1,100 +1,83 @@
 schema: '2.0'
 stages:
   prepare:
-    cmd: python src/data_preparation.py
+    cmd: poetry run python src/data_preparation.py
     deps:
-    - path: data/olist_customers_dataset.csv
+    - path: data/raw/olist_customers_dataset.csv
       hash: md5
       md5: 8a2c4244856aab4bde3b8ed81f8ca251
       size: 9033957
-    - path: data/olist_order_items_dataset.csv
+    - path: data/raw/olist_order_items_dataset.csv
       hash: md5
       md5: f4fa76976662e9cba0633f9e49ed2645
       size: 15438671
-    - path: data/olist_order_payments_dataset.csv
+    - path: data/raw/olist_order_payments_dataset.csv
       hash: md5
-      md5: d7aaceca670b76770e73286f99f3edfc
-      size: 5737249
-    - path: data/olist_order_reviews_dataset.csv
+      md5: 75ce0c041d18e5f250c5cea9a8042944
+      size: 5777138
+    - path: data/raw/olist_order_reviews_dataset.csv
       hash: md5
       md5: 914066be00d2db0c3d857f071cff1688
       size: 14451670
-    - path: data/olist_orders_dataset.csv
+    - path: data/raw/olist_orders_dataset.csv
       hash: md5
       md5: 8bd60e55c1ca229d9f70b62f3e72f22c
       size: 17654914
-    - path: data/olist_products_dataset.csv
+    - path: data/raw/olist_products_dataset.csv
       hash: md5
       md5: e935401104a3669223b83c9a01fdf5ca
       size: 2379446
-    - path: data/olist_sellers_dataset.csv
-      hash: md5
-      md5: 5b22c02facdf842d6c0aea36e1849018
-      size: 174703
-    - path: data/product_category_name_translation.csv
+    - path: data/raw/product_category_name_translation.csv
       hash: md5
       md5: 4196d142e8f2b9697521fc50c97f626b
       size: 2613
     - path: src/data_preparation.py
       hash: md5
-      md5: bb5f9e688869fde8cb1eab668dbc0d3e
-      size: 2123
-    - path: src/preprocessing_pipeline.py
-      hash: md5
-      md5: fe49917918900c126f8dec8a573e9053
-      size: 18704
+      md5: a3d8b407f61647d21d83c277525ee71b
+      size: 9237
     outs:
-    - path: data/processed
+    - path: data/processed/README.md
       hash: md5
-      md5: 441d8de39762526715d4b5c8568b4826.dir
-      size: 55574394
-      nfiles: 5
-  train:
-    cmd: python src/model_training.py
+      md5: 57b0bccbe58bf550f4ff3826e959a33a
+      size: 1617
+    - path: data/processed/interactions.parquet
+      hash: md5
+      md5: c0ebb24a636307b3da61df22c5fb7780
+      size: 5970239
+  featurize:
+    cmd: poetry run python src/feature_engineering.py
     deps:
-    - path: data/processed
+    - path: data/processed/interactions.parquet
       hash: md5
-      md5: 441d8de39762526715d4b5c8568b4826.dir
-      size: 55574394
-      nfiles: 5
-    - path: src/baseline_models.py
+      md5: c0ebb24a636307b3da61df22c5fb7780
+      size: 5970239
+    - path: src/feature_engineering.py
       hash: md5
-      md5: 70a3d3ea3e220146356bf83b6f3b8212
-      size: 13942
-    - path: src/model_training.py
-      hash: md5
-      md5: 6556b92b855edbe6dcb19ee9ff662a23
-      size: 3601
+      md5: 5dde2e2c956bc73286f57279d2a78e6b
+      size: 18175
     outs:
-    - path: models
+    - path: data/processed/FEATURES.md
       hash: md5
-      md5: 313ffa7836cdd007d20fcdf8a0f0882d.dir
-      size: 12739813
-      nfiles: 10
-  evaluate:
-    cmd: python src/model_evaluation.py
+      md5: bdce7b0f9707d7a9ec73f0fdaf8ac29f
+      size: 2600
+    - path: data/processed/feature_metadata.json
+      hash: md5
+      md5: 026e42c537f1caa310a50aa902863c87
+      size: 1732
+    - path: data/processed/id_mappings.json
+      hash: md5
+      md5: d43cef6c9b8d5a29ec1a406ad959cd49
+      size: 5379246
+    - path: data/processed/interactions_fe.parquet
+      hash: md5
+      md5: 682343d6a6d8ef3c8e7d8959ddfe12e2
+      size: 8857934
+  validate:
+    cmd: "poetry run python -c \" import pandas as pd df = pd.read_parquet('data/processed/interactions_fe.parquet')
+      assert df.shape == (99785, 42), f'Wrong shape: {df.shape}' assert df['review_score'].isna().sum()
+      < 1000, 'Too many null reviews' print('Validation OK:', df.shape) \"\n"
     deps:
-    - path: data/processed
+    - path: data/processed/interactions_fe.parquet
       hash: md5
-      md5: 441d8de39762526715d4b5c8568b4826.dir
-      size: 55574394
-      nfiles: 5
-    - path: models
-      hash: md5
-      md5: 313ffa7836cdd007d20fcdf8a0f0882d.dir
-      size: 12739813
-      nfiles: 10
-    - path: src/baseline_models.py
-      hash: md5
-      md5: 70a3d3ea3e220146356bf83b6f3b8212
-      size: 13942
-    - path: src/model_evaluation.py
-      hash: md5
-      md5: 440e963f9e891bfaff7ac0c513d67f68
-      size: 4310
-    outs:
-    - path: artifacts
-      hash: md5
-      md5: 8fbc7b591bbaa57230dd66f4ac206eba.dir
-      size: 354040
-      nfiles: 4
+      md5: 682343d6a6d8ef3c8e7d8959ddfe12e2
+      size: 8857934

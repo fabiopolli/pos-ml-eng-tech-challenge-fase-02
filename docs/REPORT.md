@@ -1,0 +1,447 @@
+# Relatório de Progresso — Sistema de Recomendação Olist
+
+**Projeto:** Olist Recommender System  
+**Disciplina:** Tech Challenge Fase 02 — Pós-graduação ML Engineering  
+**Data de Início:** 2026-06-18  
+**Status Atual:** Fase 2 (Engenharia de Dados e Modelagem) concluída — Pronto para Modelagem
+
+---
+
+## 1. Visão Geral do Projeto
+
+### 1.1 Descrição
+Este projeto foca no desenvolvimento end-to-end de um Sistema de Recomendação com MLOps, concebido para o Tech Challenge Fase 02 da pós-graduação em Machine Learning Engineering. Utilizando o dataset Olist Brazilian E-Commerce, que abrange cerca de 100 mil pedidos realizados entre 2016 e 2018, o sistema busca oferecer recomendações precisas de produtos aos usuários. A abordagem incorpora boas práticas de engenharia de dados, machine learning e MLOps para garantir rastreabilidade, escalabilidade e reprodutibilidade ao longo de todo o ciclo de vida do modelo.
+
+### 1.2 Stack Tecnológica
+| Categoria | Tecnologia | Versão/Finalidade |
+|---|---|---|
+| **Linguagem** | Python | 3.12 (fixado via uv python pin) |
+| **Gerenciamento de Pacotes** | uv (Astral) | Gestão rápida de dependências e ambientes |
+| **Deep Learning** | PyTorch | ≥ 2.1 — Implementação de MLP / Embeddings |
+| **Machine Learning Base** | Scikit-Learn | ≥ 1.4 — Modelos de baseline comparativos |
+| **Manipulação de Dados** | Pandas, NumPy, PyArrow | ≥ 2.2, ≥ 1.26, ≥ 15 — Processamento e manipulação ágil |
+| **Tracking e MLOps** | MLflow | ≥ 2.10 — Rastreamento de experimentos e métricas |
+| **Versionamento de Dados** | DVC | ≥ 3.48 — Versionamento e pipelines de dados |
+| **Engenharia de Software** | Loguru, Ruff, Pytest | ≥ 0.7, ≥ 0.3, ≥ 8 — Logging, lint/format, testes |
+| **Infraestrutura** | Docker | Containerização do ambiente (a implementar) |
+| **Cloud** | AWS, Azure ou GCP | Deploy e infraestrutura remota (a definir) |
+
+### 1.3 Objetivos do Tech Challenge
+*   Garantir um mínimo de 10.000 interações user-item (atingido: 99.785 interações processadas).
+*   Implementar e acompanhar pelo menos 4 métricas quantitativas (planejado: Recall@K, NDCG@K, MAP@K, Hit Rate@K).
+*   Registrar no mínimo 3 runs distintos utilizando o MLflow.
+*   Estabelecer no mínimo 3 estágios independentes no pipeline do DVC.
+*   Desenvolver o modelo central utilizando arquiteturas MLP ou Embeddings com PyTorch.
+*   Criar baselines comparativos utilizando Scikit-Learn.
+*   Realizar o deploy do sistema em cloud, fornecendo uma URL pública para acesso.
+*   Produzir a documentação final através de um Model Card e um vídeo STAR de 5 minutos.
+
+---
+
+## 2. Linha do Tempo (Timeline)
+
+| Data | Fase | Atividade | Status | Entregas |
+|---|---|---|---|---|
+| 2026-06-18 | 0 | Análise inicial do desafio | ✅ | Análise técnica + requisitos |
+| 2026-06-18 | 1 | Análise exploratória do dataset (EDA) | ✅ | reports/eda_report.md + 8 figuras PNG |
+| 2026-06-18 | 1 | Pipeline de preparação de dados | ✅ | src/data_preparation.py + interactions.parquet |
+| 2026-06-18 | 2 | Configuração do ambiente Python (uv) | ✅ | pyproject.toml + uv.lock + .venv |
+| 2026-06-18 | 2 | Feature Engineering + correção cold-start | ✅ | src/feature_engineering.py + interactions_fe.parquet |
+
+---
+
+## 3. Etapa 1 — Análise do Desafio
+
+### 3.1 Requisitos Técnicos Identificados
+*   A base de dados necessita possuir interações consistentes entre usuários e itens (superando largamente o piso exigido de 10.000 registros).
+*   O uso de PyTorch é mandatório para a construção do modelo de Deep Learning principal.
+*   O estabelecimento de métricas robustas de ranqueamento, que são vitais para sistemas de recomendação em cenários reais, é exigido.
+*   Realizar o tracking disciplinado de todos os experimentos via MLflow.
+*   Criar uma arquitetura de dados plenamente reprodutível através de pipelines versionados no DVC.
+*   Disponibilizar a solução finalizada por meio de um deploy em cloud acessível publicamente via internet.
+
+### 3.2 Pontos de Atenção
+*   **Problema de Cold-Start:** Novos usuários ou novos produtos podem sofrer com a falta de interações prévias na modelagem, o que pode enviesar o treinamento.
+*   **Extrema Esparsidade (Sparsity):** A maioria esmagadora dos usuários possui pouquíssimas interações (geralmente uma), dificultando o aprendizado consistente das representações vetoriais.
+*   **Risco de Data Leakage:** Há a necessidade estrita de garantir um split temporal ou metodológico rigoroso entre treino e teste, evitando o vazamento de dados do futuro para prever o passado.
+*   **Garantia de Reprodutibilidade:** Ambientes de dependência Python que são muito voláteis requerem o uso de ferramentas robustas de travamento (como `uv` e `DVC`) para assegurar exatamente os mesmos resultados ao rodar os scripts em diferentes máquinas.
+
+### 3.3 Recomendações Estratégicas
+*   Adotar técnicas consolidadas, como Neural Collaborative Filtering (NCF), para conseguir explorar eficientemente tanto a matriz de interações quanto as features complementares do lado do usuário e do produto.
+*   Concentrar as avaliações no uso de métricas focadas no top-K (como Recall@K e NDCG@K), já que elas lidam muito melhor com listas ordenadas que são a base dos sistemas de recomendação.
+*   Desativar preventivamente e temporariamente o filtro severo de cold-start caso ele venha a inviabilizar a obtenção do volume mínimo de dados necessário para treinamento da rede neural.
+*   Implementar baselines simplificados muito rapidamente (usando scikit-learn) para que se consiga medir o ganho de eficiência real advindo das abordagens mais complexas e profundas no PyTorch.
+
+---
+
+## 4. Etapa 2 — Análise Exploratória do Dataset (EDA)
+
+### 4.1 Dataset Identificado
+O dataset Olist Brazilian E-Commerce compreende um vasto conjunto de interações de compras reais em um marketplace brasileiro que engloba o período temporal focado entre os anos de 2016 e 2018. Ele contém centenas de milhares de pedidos dispersos em um schema com várias tabelas relacionais, capturando e modelando o perfil completo da jornada de um cliente, começando da escolha do frete e do método de pagamento até culminar na sua avaliação final de satisfação (review).
+
+### 4.2 Descobertas-Chave
+*   Os preços dos produtos possuem uma distribuição que é largamente enviesada de forma assimétrica, com forte predominância absoluta na faixa de itens de baixo e médio valor agregado.
+*   O pagamento dos pedidos de compra é predominantemente efetuado utilizando cartão de crédito em parcelamentos de curto a médio prazo.
+*   Existe uma concentração demográfica e geográfica extremamente intensa de usuários baseados na região Sudeste do Brasil (com notável destaque para o próprio estado de SP).
+*   A grande maioria dos carrinhos criados contém um único tipo de produto, indicando fortemente que os hábitos são baseados em compras focadas e não em aquisições muito extensivas.
+*   As avaliações recebidas (reviews) demonstram uma tendência muito positiva e bem acentuada, com a nota máxima de satisfação (5 estrelas) sendo flagrantemente prevalecente.
+*   Identificamos que há uma forte correlação linear inicial entre algumas features quantitativas calculadas de imediato, o que evidenciou que estas precisariam ser criticamente avaliadas antes da modelagem em si.
+
+### 4.3 Insights para o Sistema de Recomendação
+*   Para um ambiente de recomendação sem uma matriz explícita de "gostos", torna-se absolutamente crucial derivar de modo implícito as interações diretas entre os usuários e os itens através do histórico real de pedidos efetuados e concluídos na plataforma.
+*   A utilização da feature `customer_unique_id` (em detrimento da chave natural do pedido em si) é um alicerce que foi avaliado como sendo fundamental para se conseguir construir perfis plenamente consolidados da jornada histórica de compra de cada indivíduo da base ao longo de todo o tempo registrado.
+*   Felizmente, o montante correspondente ao volume total de registros consolidados se mostrou mais do que perfeitamente adequado para nos permitir bater a arrojada meta imposta que pedia o limiar mínimo de 10.000 interações viáveis para treinamento e aprovação. Este montante irá simplificar consideravelmente a capacidade de viabilizar a arquitetura e garantir a convergência do motor base do modelo idealizado com PyTorch.
+*   A exploração detida do acervo, bem como o mapeamento completo da distribuição de popularidade dos itens que constituem o catálogo em foco, revelou um clássico comportamento de "long-tail". Uma inferência disto em tempo prático é exigir diretamente que a futura malha e o esqueleto central da rede idealizada do sistema possuam sabedoria para saber lidar efetivamente e performaticamente bem com um acervo de milhares de produtos de forma que abarque e ranqueie também produtos pouco populares.
+*   Embora fosse algo que constava minimamente dentro das margens das previsões primárias na esfera de planejamento do projeto, fomos impactados com o fato pragmático e aferível matematicamente de que a base global conta com um número de interações bastante acanhado, configurando e atestando perfeitamente o fenômeno conhecido pela literatura focada em Data Science como extrema "Sparsity". Tudo isso, enfim, consolidou para nós e nos forçou a reforçar a premente necessidade da arquitetura e concepção integral pautarem abordagens de um nível bem acentuadamente mais moderno, o que reflete nossa inclinação irrevogável de investir com bastante ímpeto, foco temporal, computacional e dedicação estrutural em um tratamento profundo baseado em embeddings em rede neural.
+
+---
+
+## 5. Etapa 3 — Pipeline de Preparação de Dados
+
+### 5.1 Decisões de Design
+| Aspecto Analisado | Proposta Original | Implementação Final | Justificativa / Impacto |
+|---|---|---|---|
+| **Formato de Saída** | CSV | Parquet | Menor tamanho, preserva tipos nativos de dados, carregamento rápido |
+| **Path de Gravação** | `data/raw` | Caminho Absoluto | Resolvido erro de mapeamento relativo no script principal |
+| **Filtro de Status do Pedido** | Todos | Apenas "delivered" | Garante qualidade e evita recomendar itens que foram cancelados |
+| **Nota de Review (review_score)** | Ausente | Incorporada | Oferece um peso de preferência explícito para a interação |
+| **Marcação de Timestamp** | `order_purchase_timestamp` | Mantido e tipado | Necessário para evitar data leakage durante o split temporal |
+| **Agregação de Interação** | Por Order ID | Por `customer_unique_id` | Mapeia o gosto real consolidado do usuário e não apenas do carrinho |
+| **Filtro Cold-Start Severo** | Aplicado indiscriminadamente | Desabilitado | Reduzia o dataset para apenas 2.656 linhas, o que descumpre o requisito |
+| **Features Temporais Iniciais** | Ano/Mês separados | Embutido no DateTime | Otimiza os passos de Feature Engineering posteriores |
+| **Tratamento Nulos** | Remoção de linhas inteiras | Preservação (apenas review_score possui nulos) | Retém 687 registros valiosos para engajamento e cliques |
+| **Uso de Dependências** | Pip Padrão | Pip + `uv` | Acelera em mais de 10x a resolução do grafo de dependência e instalação |
+
+### 5.2 Arquivos Criados
+*   `src/data_preparation.py`: Script Python com aproximadamente 270 linhas, responsável pela extração, limpeza e agregação dos dados crus provenientes do Kaggle. O código implementa tratamentos para tipos de dados, formatação de datas e união estruturada das tabelas relacionais do esquema original.
+*   `data/processed/interactions.parquet`: Arquivo gerado de 5.66 MB contendo o dataset final processado em formato colunar otimizado (Parquet). Este formato garante compressão eficiente e preservação rigorosa da tipagem dos dados em relação a formatos textuais tradicionais como CSV.
+*   `data/processed/README.md`: Dicionário de dados documentando a definição exata, origem e tipo de cada coluna presente no dataset resultante. Atua como artefato de governança de dados essencial para a rastreabilidade da fase de Feature Engineering.
+
+### 5.3 Estatísticas do Dataset Limpo
+| Métrica | Valor Obtido | Descrição |
+|---|---|---|
+| Interações Processadas | 99.785 | Volume total de eventos usuário-item mantidos após limpeza, superando o requisito mínimo de 10.000 interações. |
+| Usuários Únicos | 93.358 | Número distinto de clientes na plataforma. |
+| Produtos Únicos | 32.216 | Quantidade de itens distintos interagidos. |
+| Categorias Únicas | 72 | Total de famílias de produtos mapeadas. |
+| Sparsity (Esparsidade) | 99,9967% | Proporção de entradas nulas na matriz teórica de usuários-itens, típica de domínios de e-commerce. |
+| Pedidos Entregues | 110.840 | Quantidade de pedidos brutos filtrados antes da consolidação final no nível de usuário/produto. |
+| Janela Temporal | 2016-09-15 a 2018-08-29 | Período de cobertura dos dados processados, essencial para planejar o split temporal. |
+
+A esparsidade extrema observada (99,9967%) reflete um cenário no qual a imensa maioria dos usuários interage com uma fração minúscula do catálogo de produtos. Isso justifica a adoção futura de algoritmos robustos a cold-start e de representações latentes densas, como embeddings, capazes de inferir similaridade não-trivial entre usuários e itens sem a dependência exclusiva de co-ocorrência.
+
+---
+
+## 6. Etapa 4 — Configuração do Ambiente Python
+
+### 6.1 Ferramenta Escolhida
+A gestão do ambiente Python e de suas dependências foi estruturada utilizando a ferramenta `uv` (desenvolvida pela Astral). A escolha desta solução em detrimento de alternativas consolidadas como pip, poetry ou conda é justificada pela sua alta velocidade de resolução baseada em Rust e capacidade de garantir builds reproduzíveis via lock file (`uv.lock`) rigorosamente determinístico. Além disso, o recurso `uv python pin` solucionou um impasse crítico de incompatibilidade com a versão global padrão (Python 3.13) do sistema operacional anfitrião, viabilizando a ancoragem hermética da execução na versão Python 3.12, ambiente perfeitamente maduro e compatível com as bibliotecas requeridas.
+
+### 6.2 Dependências
+
+#### Produção
+Estas bibliotecas compõem o arcabouço primário de execução analítica e modelagem estocástica do projeto.
+*   `pandas`, `numpy`, `pyarrow`: Manipulação ágil de dataframes, execução de álgebra linear eficiente e I/O de arquivos Parquet.
+*   `scikit-learn`: Fornecimento de transformadores algorítmicos (encoders) e modelagem de baselines.
+*   `torch`: Infraestrutura de tensores em hardware acelerado, obrigatória para o motor principal de deep learning.
+*   `loguru`: Padronização assíncrona de logs estruturados em rotinas do projeto.
+
+#### Desenvolvimento
+Destinadas estritamente à integridade e manutenibilidade do código-fonte.
+*   `pytest`: Framework de asserção automática focado no controle de qualidade (Quality Assurance) contínuo.
+*   `ruff`: Linter e analisador estático ultra-rápido, impondo aderência consistente à PEP 8.
+*   `seaborn` e `matplotlib`: Componentes fundamentais de projeção visual gráfica utilizados durante a Análise Exploratória.
+
+#### Cloud & MLOps
+Ferramentas essenciais para escalabilidade, versionamento e governança metodológica.
+*   `mlflow`: Registro sistemático de parâmetros, métricas de avaliação do modelo e versionamento de artefatos.
+*   `dvc`: Orquestração de grafos acíclicos dirigidos (DAGs) atrelada ao rastreamento estrito da evolução temporal dos dados.
+
+### 6.3 Arquivos de Configuração
+*   `pyproject.toml`: Manifesto de configuração global determinando metadados do projeto e definições de build.
+*   `uv.lock`: Matriz gerada contendo árvores de dependência congeladas em hashes invioláveis, garantindo que instalações reproduzam sempre versões exatas de pacotes.
+*   `.python-version`: Diretiva local forçando a restrição do interpretador para a versão exata requisitada (Python 3.12).
+*   `.gitignore`: Restringe os artefatos irrelevantes ou de cunho estritamente local/secreto de submissões acidentais no repositório.
+*   `README.md`: Documento de escopo que concentra diretrizes metodológicas essenciais para orquestração geral e replicabilidade.
+*   `configs/.gitkeep`: Preserva e integra a pasta de configurações à árvore estrutural independentemente do preenchimento atual.
+
+### 6.4 Entry Points Configurados
+| Comando | Descrição | Tecnologia |
+|---|---|---|
+| `uv run python3 src/data_preparation.py` | Executa o pipeline sequencial de agregação para higienização e unificação dos dados brutos em Parquet. | Python |
+| `uv run ruff check .` | Invoca a suíte estática avaliando anomalias estruturais ou falhas de formatação não condizentes com boas práticas. | Ruff |
+| `uv run pytest` | Aciona a integração de testes unitários mitigando potenciais regressões ou bugs nos sub-módulos lógicos. | Pytest |
+
+---
+
+## 7. Etapa 5 — Feature Engineering
+
+### 7.1 Descobertas do EDA Aplicadas
+O enriquecimento dos atributos basais utilizou integralmente o levantamento analítico preestabelecido na fase EDA. Primordialmente, mitigou-se a severidade de deleções associadas ao "cold-start" desabilitando lógicas de expurgo temporal, uma deliberação forjada objetivando contornar a perda massiva do número de observações requeridas. Observando uma distribuição marcadamente _long-tail_, incorporamos atributos atrelados diretamente a índices de frequência do item, o que concede ao algoritmo insumos concretos para modelagem de entidades incomuns. Considerando correlações latentes não triviais evidenciadas e distribuições de variáveis financeiras excessivamente inclinadas, efetuaram-se estratégias diretas de transformação logarítmica (Log1p).
+
+### 7.2 Features Geradas
+| Categoria da Feature | Contagem | Exemplos Representativos |
+|---|---|---|
+| **Identificadores** | 3 | `customer_unique_id`, `product_id`, `order_id` |
+| **Target (Alvo)** | 2 | `review_score` e uma flag indicadora binária de satisfação. |
+| **Numéricas** | 10 | Variáveis contínuas normalizadas e aplicadas via conversões Log1p (ex: valores de frete, preços de aquisição). |
+| **Temporais** | 8 | Ano civil, trimestre corrente, dia semanal e horários fragmentados para sazonalidade. |
+| **Categóricas Encodadas** | 5 | Atributos englobando estados da federação brasileira e hierarquia principal da categoria transacionada. |
+| **Agregações do Usuário** | 7 | Frequência agregada histórica de compra, índice de recência da última interação, e dispêndio médio apurado do indivíduo. |
+| **Agregações do Produto** | 7 | Contagem holística na base global de vendas do item, relevância dentro do setor da categoria e volume de ticket nominal diário. |
+
+### 7.3 Features Removidas
+| Nome da Feature | Motivo da Remoção |
+|---|---|
+| `constante_teste_1` | Variância global em nível perfeitamente fixo, nulo (zero absoluto), acarretando no descarte sumário por falta de capacidade analítica preditiva. |
+| `constante_teste_2` | Expressividade estritamente nula, incapaz de prover insumos de entropia ou variância matemática favorável. |
+| `constante_teste_3` | Coluna com cardinalidade estática redundante não inferindo variações para divisão hierárquica por meio de algoritmos. |
+| `product_volume_cm3` | Extrema multicolinearidade, identificando correspondência absoluta por ser unicamente extraída via dimensões espaciais lineares inerentes já englobadas. |
+| `order_item_id_max` | Correlação estritamente positiva, de fator colinear beirando Pearson P > 0.99, vinculada em repetição direta à contagem de itens num mesmo escopo temporal da nota. |
+| `freight_value_log` | Consolidada e sintetizada ativamente como vetor adjacente direto para composição na coluna do próprio valor tarifado em média atrelada. |
+| `payment_installments_sum` | Amarra atrelada inefetivamente, cujo nível isolado provou-se inútil para determinação exata da satisfação associada da transação em base global ao longo da jornada recomendada do usuário. |
+
+### 7.4 Estatísticas Finais
+| Dimensão | Quantidade Final |
+|---|---|
+| Linhas Totais (Amostras) | 99.785 |
+| Colunas Finais (Features) | 42 |
+| Registros contendo Nulos | 687 (Circunscrito de maneira isolada em `review_score`) |
+
+O ganho informacional das novas variáveis de agregação enriqueceu decisivamente a representação estatística vetorial sem elevar o custo da temida maldição da dimensionalidade, visto que 7 features com alta redundância algorítmica ou inércia constante foram decapitadas do ambiente transacional, restando apenas o refinamento contextual fidedigno de atributos consolidados.
+
+### 7.5 Detalhamento das Features e Estratégias de Uso
+
+#### 7.5.1 Identificadores (5 features)
+
+**Descrição**: São as chaves primárias do problema de recomendação. Os identificadores numéricos (`user_id`, `product_id_idx`, `category_id`) são mapeamentos sequenciais otimizados para indexação densa.
+
+**Features e Justificativas**:
+| Feature | Tipo | Importância |
+|---|---|---|
+| `customer_unique_id` | string | Identifica univocamente um comprador |
+| `product_id` | string | Identifica univocamente um item |
+| `user_id` | int | Índice denso para embedding de usuário |
+| `product_id_idx` | int | Índice denso para embedding de produto |
+| `category_id` | int | Índice denso para embedding de categoria |
+
+**Uso nos Modelos Baseline (Scikit-Learn)**:
+- No TruncatedSVD, use `user_id` e `product_id_idx` para montar a matriz esparsa.
+- Em GradientBoosting, aplique `OrdinalEncoder` nos índices; descarte strings.
+
+**Uso no Modelo MLP/Embeddings (PyTorch)**:
+- `user_id` e `product_id_idx` alimentam camadas `nn.Embedding`.
+- Os tensores resultantes sofrem dropout e concatenam-se com variáveis contínuas numéricas antes da camada MLP.
+
+#### 7.5.2 Target / Sinal (3 features)
+
+**Descrição**: Refletem o feedback qualitativo e quantitativo do usuário sobre a compra, combinando notas explícitas e indicativos implícitos de reincidência.
+
+**Features e Justificativas**:
+| Feature | Tipo | Importância |
+|---|---|---|
+| `review_score` | float | Nota dada pelo usuário (1 a 5) |
+| `has_review` | int | Flag binária (0/1) indicando presença de feedback |
+| `purchase_count` | int | Proxy de fidelidade através de recompras |
+
+**Uso nos Modelos Baseline (Scikit-Learn)**:
+- Para regressão, use `review_score` como alvo (substitua nulos pela média global).
+- Em classificação, converta `review_score` > 4 em classe positiva.
+
+**Uso no Modelo MLP/Embeddings (PyTorch)**:
+- `review_score` age como variável target otimizada via erro quadrático (MSE).
+- `has_review` pode atuar como ponderador de confiança na função de perda.
+
+#### 7.5.3 Numéricas (6 features)
+
+**Descrição**: Agrupam valores monetários de produto e logística. Transformações logarítmicas (Log1p) normalizam a distribuição fortemente assimétrica característica do e-commerce.
+
+**Features e Justificativas**:
+| Feature | Tipo | Importância |
+|---|---|---|
+| `price` | float | Valor bruto do produto |
+| `freight_value` | float | Custo logístico do frete |
+| `price_log` | float | Versão estabilizada (Log1p) para mitigar outliers |
+| `freight_value_log` | float | Versão estabilizada (Log1p) reduzindo dispersão |
+| `price_to_freight_ratio` | float | Proporção que revela peso do frete no custo final |
+| `has_price_outlier` | int | Flag sinalizando produtos caros (Percentil 99) |
+
+**Uso nos Modelos Baseline (Scikit-Learn)**:
+- Algoritmos baseados em árvore utilizam atributos brutos (`price`).
+- Regressores lineares requerem versões logarítmicas escaladas com `StandardScaler`.
+
+**Uso no Modelo MLP/Embeddings (PyTorch)**:
+- Incorpore apenas variáveis logarítmicas normalizadas por `nn.BatchNorm1d`.
+- Concatene o flag booleano de forma direta, sem normalização.
+
+#### 7.5.4 Temporais (8 features)
+
+**Descrição**: Marcadores cronológicos que contextualizam o instante da transação, viabilizando o aprendizado de sazonalidades anuais e o comportamento de consumo cíclico semanal.
+
+**Features e Justificativas**:
+| Feature | Tipo | Importância |
+|---|---|---|
+| `purchase_year` / `purchase_month` | int | Situa picos de vendas macros (ex: feriados) |
+| `purchase_day_of_week` / `purchase_hour` | int | Traça ciclos rotineiros do período de acesso |
+| `is_weekend` / `is_holiday_season` | int | Flags binárias de comportamento ocasional |
+| `days_since_reference` | int | Base contínua sequencial viabilizando métricas temporais |
+
+**Uso nos Modelos Baseline (Scikit-Learn)**:
+- Regressões lineares exigem One-Hot Encoding em campos circulares como a hora.
+- Modelos em árvore dividem naturalmente bases temporais sequenciais como dias contínuos.
+
+**Uso no Modelo MLP/Embeddings (PyTorch)**:
+- Acondicione features cíclicas de baixa cardinalidade em pequenas projeções (`nn.Embedding(24,4)`).
+- A base temporal sequencial exige estabilização padronizada imediata.
+
+#### 7.5.5 Categóricas Encodadas (8 features)
+
+**Descrição**: Refletem dados mercadológicos estruturados, transformando categorias de negócio e formatos de quitação financeira em projeções escalares consistentes.
+
+**Features e Justificativas**:
+| Feature | Tipo | Importância |
+|---|---|---|
+| `category_target_enc` | float | Média Bayesiana reveladora da qualidade padrão do setor |
+| `category_frequency` | float | Propensão da área frente a vendas da prateleira |
+| `category_is_top10` / `category_is_rare` | int | Segmentadores de extremos absolutos de tráfego |
+| `payment_type_*` | int | Binários indicativos de transação (Crédito, Boleto, etc) |
+
+**Uso nos Modelos Baseline (Scikit-Learn)**:
+- Os pagamentos encodados acoplam-se homogeneamente em modelos vetorizados.
+- A projeção categórica média age fortemente em regressões lógicas, antecipando viés setorial.
+
+**Uso no Modelo MLP/Embeddings (PyTorch)**:
+- Metadados quantificados fluem linearmente transpondo estágios da BatchNorm1d.
+- Os indicadores monetários booleanos justapõem-se no repasse antecedendo processamentos densos.
+
+#### 7.5.6 Agregações do Usuário (6 features)
+
+**Descrição**: Consolidam estatisticamente toda a jornada do comprador. Identificam seu volume rotineiro transacional, distanciamentos na lealdade temporal e tolerância pecuniária.
+
+**Features e Justificativas**:
+| Feature | Tipo | Importância |
+|---|---|---|
+| `user_total_purchases` | int | Mensuração da solidez ativa do perfil cadastrado |
+| `user_avg_price` / `user_avg_freight` | float | Referencial sintético da zona de ticket financeiro |
+| `user_purchase_span_days` / `user_recency_days` | int | Rastreador de reativação pontuando períodos adormecidos |
+| `user_review_rate` | float | Parcela das transações portando feedback submetido |
+
+**Uso nos Modelos Baseline (Scikit-Learn)**:
+- Modelos hierárquicos seccionam agrupamentos comportamentais formando grupos sintéticos autônomos.
+- Regressões incorporam ativamente taxas normalizadas segmentando RFM (Recency, Frequency, Monetary).
+
+**Uso no Modelo MLP/Embeddings (PyTorch)**:
+- O lote de estatísticas requer compressão imediata padronizadora via BatchNorm limitando sobressaltos escalares.
+- Esta porção contígua funde-se estruturalmente na base atada ao representador matricial do identificador do usuário.
+
+#### 7.5.7 Agregações do Produto (6 features)
+
+**Descrição**: Cristalizam o perfil mercadológico do item. Mensuram reputação e amplitude global atestadas empiricamente por observações históricas.
+
+**Features e Justificativas**:
+| Feature | Tipo | Importância |
+|---|---|---|
+| `product_popularity` / `product_unique_buyers` | int | Escala real evidenciando a base disseminada de consumo popular |
+| `product_avg_review_score` | float | Centralização pontual documentando qualidade empírica provada |
+| `product_avg_price` / `product_avg_freight` | float | Custo mediano intrínseco fixo vinculado estruturalmente na oferta |
+| `product_review_rate` | float | Apelo comunicativo latente para estímulo a considerações espontâneas |
+
+**Uso nos Modelos Baseline (Scikit-Learn)**:
+- Modelos baseados no heurístico de popularidade alocam instâncias estritamente baseadas nesta consolidação fixa.
+- Árvores randômicas utilizam fortemente estas características para bifurcações dominantes no topo.
+
+**Uso no Modelo MLP/Embeddings (PyTorch)**:
+- O bloco contínuo agrega volume coeso juntando-se paralelamente ao embedding de identificação do item base.
+- Padronização linear constitui regra compulsória barrando gradientes destrutivos provocados pela magnitude desmedida da popularidade bruta.
+
+---
+
+## 8. Issues Conhecidos e Resoluções
+
+| Issue | Resolução Implementada |
+|---|---|
+| Python 3.13 padrão incompatível provocando quebras em dependências MLOps nativas. | Mitigado pela alocação forçosa e retroativa das diretrizes do `uv python pin 3.12`. |
+| Alias terminal genérico `python` não direcionava ao ambiente interpretador local. | Substituição protocolar invocando chamadas prefixadas em `uv run python3`. |
+| Falha do diretório abstrato para alcançar dados provenientes do repositório subdiretório `data/raw`. | Adoção corretiva de caminhos plenamente absolutos gerenciados pela biblioteca `pathlib`. |
+| Ausência explícita e reportada na engine visual pela omissão global de biblioteca base. | Adição ágil e controlada orientando injeção via `uv add seaborn`. |
+| Filtro de cold-start se revelou restritivo de modo pernicioso reduzindo massa amostral viável para apenas 2.656 instâncias iterativas. | Inativação e exclusão preventiva das contingências limitantes no pipeline. |
+| Detecção automática da presença latente de vetores analíticos possuindo pura constância determinística isolada. | Abate e remoção sistêmica de exatamente 3 parâmetros caracterizados por constante absoluta variância zerada. |
+| Evidência latente por meio analítico descortinando redundância e similaridade linear extrema entre pilares de dimensão informacional. | Expurgo cirúrgico e exclusão de 4 métricas categóricas super-correlacionadas com dependência linear de terceiros. |
+
+---
+
+## 9. Métricas de Sucesso
+
+| Requisito do Tech Challenge | Status |
+|---|---|
+| Manter no mínimo 10.000 interações user-item na base final | ✓ Concluído (99.785 processadas) |
+| Acompanhar ao menos 4 métricas (Recall, NDCG, MAP, Hit Rate) | ✗ A Fazer |
+| Registrar um patamar mínimo de 3 execuciones com MLflow | ✗ A Fazer |
+| Estabelecer quantitativamente 3 módulos rastreados do DVC | ✗ A Fazer |
+| Produzir base do modelo implementado através de redes em PyTorch | ✗ A Fazer |
+| Gerar pontos comparativos com o Scikit-Learn | ✗ A Fazer |
+| Disponibilizar infraestrutura serverless/endpoint em Cloud pública | ✗ A Fazer |
+| Organizar elaboração teórica com Model Card e Pitches do tipo STAR | ✗ A Fazer |
+
+---
+
+## 10. Próximas Etapas
+
+1.  **Split Temporal Consistente:** Estabelecer uma divisão Treino/Validação/Teste baseada em janelas de tempo, para evitar totalmente o data leakage.
+2.  **Desenvolvimento do Baseline:** Codificar algoritmos primários baseados em regras (Popularidade) e filtragem colaborativa tradicional (Scikit-Learn).
+3.  **Arquitetura PyTorch (MLP/Embeddings):** Levantar os contornos primários do motor neural principal focado no rankeamento (Matrix Factorization ou MLP profundo).
+4.  **Integração e Rastreabilidade MLflow:** Amarrar todas as execuções de modelo à biblioteca para garantir pelo menos os 3 logs requeridos pelo desafio.
+5.  **Pipeline DVC:** Fixar formalmente as etapas de `prepare`, `train` e `evaluate` no formato de estágios sequenciais.
+6.  **Containerização:** Preparar o Dockerfile de produção para facilitar o hand-off de backend.
+7.  **Implementação em Cloud:** Configurar os scripts de deploy numa infra AWS, Azure ou GCP com endpoints REST funcionais.
+8.  **Elaboração do Model Card:** Discorrer sobre métricas, premissas de negócio e limitações teóricas e práticas do ranker.
+9.  **Gravação do Pitch em Vídeo (STAR):** Sintetizar todos os esforços na apresentação obrigatória da banca avaliadora.
+
+---
+
+## 11. Comandos Úteis
+
+**Setup do Ambiente (uv):**
+```bash
+uv python pin 3.12
+uv sync
+```
+
+**Preparação e Feature Engineering:**
+```bash
+uv run python3 src/data_preparation.py
+uv run python3 src/feature_engineering.py
+```
+
+**Execução de Testes:**
+```bash
+uv run pytest -v
+```
+
+**Linting de Código e Formatação:**
+```bash
+uv run ruff check . --fix
+uv run ruff format .
+```
+
+**Visualização de Diretórios (Opcional):**
+```bash
+tree src/ data/ -L 2
+```
+
+---
+
+## 12. Conclusão Geral
+A Fase 02 encerra o pilar fundacional e analítico deste projeto com absoluto sucesso ao prover uma infraestrutura metodológica resiliente, ultrapassando amplamente o requisito mínimo de 10.000 amostras (alcançando o marco validado de 99.785 interações processadas). O ambiente local encontra-se devidamente isolado sob diretrizes rigorosas da ferramenta `uv`, garantindo total reprodutibilidade. Com a higienização massiva, os tratamentos de valores atípicos e o enriquecimento de contexto através de um acervo conciso de 42 features dimensionais limpas e coesas finalizados de maneira iterativa, a esteira de dados encontra-se madura. Este alicerce consolida de modo estruturado o terreno para as etapas iminentes de treinamento estocástico, monitorado continuamente via MLflow, focando prioritariamente na experimentação das arquiteturas basais e na construção direta do modelo robusto via embeddings providos nativamente através do framework PyTorch.
+
+---
+
+## 13. Referências
+
+*   [Script de Preparação de Dados (src/data_preparation.py)](./src/data_preparation.py)
+*   [Script de Análise Exploratória (src/eda.py)](./src/eda.py)
+*   [Script de Feature Engineering (src/feature_engineering.py)](./src/feature_engineering.py)
+*   [Relatório da EDA (reports/eda_report.md)](./reports/eda_report.md)
+*   [Documentação do Processamento de Dados (data/processed/README.md)](./data/processed/README.md)
+*   [Dicionário de Features (data/processed/FEATURES.md)](./data/processed/FEATURES.md)
+*   [Proposta Inicial do Projeto (propostaV1.md)](./propostaV1.md)

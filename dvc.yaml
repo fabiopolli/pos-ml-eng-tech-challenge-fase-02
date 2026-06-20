@@ -1,41 +1,52 @@
 stages:
   prepare:
-    cmd: python src/data_preparation.py
+    desc: >
+      Stage 1: Data Preparation.
+      Merges raw Olist CSVs, filters delivered orders, 
+      aggregates user-item interactions, and saves 
+      the cleaned parquet file.
+    cmd: poetry run python src/data_preparation.py
     deps:
       - src/data_preparation.py
-      - src/preprocessing_pipeline.py
-      - data/olist_customers_dataset.csv
-      - data/olist_order_items_dataset.csv
-      - data/olist_order_payments_dataset.csv
-      - data/olist_order_reviews_dataset.csv
-      - data/olist_orders_dataset.csv
-      - data/olist_products_dataset.csv
-      - data/olist_sellers_dataset.csv
-      - data/product_category_name_translation.csv
+      - data/raw/olist_customers_dataset.csv
+      - data/raw/olist_orders_dataset.csv
+      - data/raw/olist_order_items_dataset.csv
+      - data/raw/olist_products_dataset.csv
+      - data/raw/olist_order_reviews_dataset.csv
+      - data/raw/olist_order_payments_dataset.csv
+      - data/raw/product_category_name_translation.csv
     outs:
-      - data/processed:
-          cache: true
-    desc: "Estágio 1: Carrega, limpa e pré-processa os dados brutos do Olist"
+      - data/processed/interactions.parquet
+      - data/processed/README.md
 
-  train:
-    cmd: python src/model_training.py
+  featurize:
+    desc: >
+      Stage 2: Feature Engineering.
+      Generates 42 features from the cleaned interactions:
+      numerical, temporal, categorical encodings, 
+      and user/product aggregations.
+    cmd: poetry run python src/feature_engineering.py
     deps:
-      - src/model_training.py
-      - src/baseline_models.py
-      - data/processed
+      - src/feature_engineering.py
+      - data/processed/interactions.parquet
     outs:
-      - models:
-          cache: true
-    desc: "Estágio 2: Treina todos os modelos baseline e compara performance"
+      - data/processed/interactions_fe.parquet
+      - data/processed/FEATURES.md
+      - data/processed/feature_metadata.json
+      - data/processed/id_mappings.json
 
-  evaluate:
-    cmd: python src/model_evaluation.py
+  validate:
+    desc: >
+      Stage 3: Validation.
+      Sanity checks on the feature-engineered dataset:
+      shape, columns, and absence of critical nulls.
+    cmd: >
+      poetry run python -c "
+      import pandas as pd
+      df = pd.read_parquet('data/processed/interactions_fe.parquet')
+      assert df.shape == (99785, 42), f'Wrong shape: {df.shape}'
+      assert df['review_score'].isna().sum() < 1000, 'Too many null reviews'
+      print('Validation OK:', df.shape)
+      "
     deps:
-      - src/model_evaluation.py
-      - src/baseline_models.py
-      - data/processed
-      - models
-    outs:
-      - artifacts:
-          cache: false
-    desc: "Estágio 3: Avalia os modelos e gera visualizações e relatórios finais"
+      - data/processed/interactions_fe.parquet
