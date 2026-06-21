@@ -3,13 +3,19 @@ Feature Engineering for Recommender System
 """
 
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
 import matplotlib
 import numpy as np
 import pandas as pd
-from loguru import logger
+
+try:
+    from loguru import logger
+except ImportError:  # pragma: no cover - fallback for environments without loguru
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(message)s")
+    logger = logging.getLogger(__name__)
 
 matplotlib.use("Agg")
 
@@ -509,7 +515,8 @@ def save_features(
 
 
 def main():
-    logger.add("feature_engineering.log", rotation="500 MB")
+    if hasattr(logger, "add"):
+        logger.add("feature_engineering.log", rotation="500 MB")
 
     logger.info(
         "[INFO] Cold-start filter: DISABLED (will keep all 99.785 rows to meet 10k minimum requirement)"

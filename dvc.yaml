@@ -5,16 +5,16 @@ stages:
       Merges raw Olist CSVs, filters delivered orders, 
       aggregates user-item interactions, and saves 
       the cleaned parquet file.
-    cmd: poetry run python src/data_preparation.py
+    cmd: python src/data_preparation.py
     deps:
       - src/data_preparation.py
-      - data/raw/olist_customers_dataset.csv
-      - data/raw/olist_orders_dataset.csv
-      - data/raw/olist_order_items_dataset.csv
-      - data/raw/olist_products_dataset.csv
-      - data/raw/olist_order_reviews_dataset.csv
-      - data/raw/olist_order_payments_dataset.csv
-      - data/raw/product_category_name_translation.csv
+      - data/olist_customers_dataset.csv
+      - data/olist_orders_dataset.csv
+      - data/olist_order_items_dataset.csv
+      - data/olist_products_dataset.csv
+      - data/olist_order_reviews_dataset.csv
+      - data/olist_order_payments_dataset.csv
+      - data/product_category_name_translation.csv
     outs:
       - data/processed/interactions.parquet
       - data/processed/README.md
@@ -25,7 +25,7 @@ stages:
       Generates 42 features from the cleaned interactions:
       numerical, temporal, categorical encodings, 
       and user/product aggregations.
-    cmd: poetry run python src/feature_engineering.py
+    cmd: python src/feature_engineering.py
     deps:
       - src/feature_engineering.py
       - data/processed/interactions.parquet
@@ -41,12 +41,6 @@ stages:
       Sanity checks on the feature-engineered dataset:
       shape, columns, and absence of critical nulls.
     cmd: >
-      poetry run python -c "
-      import pandas as pd
-      df = pd.read_parquet('data/processed/interactions_fe.parquet')
-      assert df.shape == (99785, 42), f'Wrong shape: {df.shape}'
-      assert df['review_score'].isna().sum() < 1000, 'Too many null reviews'
-      print('Validation OK:', df.shape)
-      "
+      python -c "import pandas as pd; df = pd.read_parquet('data/processed/interactions_fe.parquet'); assert df.shape == (99785, 42), f'Wrong shape: {df.shape}'; assert df['review_score'].isna().sum() < 1000, 'Too many null reviews'; print('Validation OK', df.shape)"
     deps:
       - data/processed/interactions_fe.parquet
