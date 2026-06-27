@@ -148,11 +148,11 @@ def analyze_numerical_features(df: pd.DataFrame, figures_dir: Path) -> None:
             stats = df[feat].describe(percentiles=percentiles)
             logger.info(f"Estatísticas descritivas para {feat}:\n{stats}")
 
-            Q1 = df[feat].quantile(0.25)
-            Q3 = df[feat].quantile(0.75)
-            IQR = Q3 - Q1
-            lower_bound = Q1 - 1.5 * IQR
-            upper_bound = Q3 + 1.5 * IQR
+            q1 = df[feat].quantile(0.25)
+            q3 = df[feat].quantile(0.75)
+            iqr = q3 - q1
+            lower_bound = q1 - 1.5 * iqr
+            upper_bound = q3 + 1.5 * iqr
 
             outliers = df[(df[feat] < lower_bound) | (df[feat] > upper_bound)]
             pct_outliers = len(outliers) / len(df) * 100

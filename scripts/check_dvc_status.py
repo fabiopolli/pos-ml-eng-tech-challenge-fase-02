@@ -5,127 +5,91 @@ Verifica o status da execução do pipeline
 """
 
 import json
-import os
 from pathlib import Path
+
 
 def check_dvc_status():
     """Verifica o status da execução do pipeline DVC"""
-    
+
     project_root = Path(".")
-    
-    print("\n" + "="*70)
-    print("📊 DVC PIPELINE STATUS CHECK")
-    print("="*70)
-    
+
+    print("\n" + "=" * 70)
+    print("DVC PIPELINE STATUS CHECK")
+    print("=" * 70)
+
     # 1. Verificar estrutura
-    print("\n✅ ESTRUTURA DO PIPELINE:")
-    print("   ├── dvc.yaml (Definição do pipeline)")
-    print("   ├── dvc.lock (Estado reproduzível)")
-    print("   └── .dvc/config (Configuração remota)")
-    
+    print("\nESTRUTURA DO PIPELINE:")
+    print("   - dvc.yaml (Definição do pipeline)")
+    print("   - dvc.lock (Estado reproduzível)")
+    print("   - .dvc/config (Configuração remota)")
+
     if (project_root / "dvc.yaml").exists():
-        print("      ✓ dvc.yaml encontrado")
+        print("   [OK] dvc.yaml encontrado")
     if (project_root / "dvc.lock").exists():
-        print("      ✓ dvc.lock encontrado")
+        print("   [OK] dvc.lock encontrado")
     if (project_root / ".dvc" / "config").exists():
-        print("      ✓ .dvc/config encontrado")
-    
+        print("   [OK] .dvc/config encontrado")
+
     # 2. Verificar estágios implementados
-    print("\n✅ ESTÁGIOS IMPLEMENTADOS:")
+    print("\nESTAGIOS IMPLEMENTADOS (DVC Pipeline):")
     print("   1. prepare   (src/data_preparation.py)")
-    print("      └─ Entradas: 8 arquivos CSV brutos")
-    print("      └─ Saídas: data/processed/ (5 arquivos)")
-    if (project_root / "data" / "processed").exists():
-        files = list((project_root / "data" / "processed").glob("*"))
-        print(f"      └─ ✓ EXECUTADO ({len(files)} arquivos criados)")
-    
-    print("\n   2. train     (src/model_training.py)")
-    print("      └─ Entradas: data/processed/*")
-    print("      └─ Saídas: models/ (modelos + métricas)")
-    if (project_root / "models").exists() and list((project_root / "models").glob("*")):
-        files = list((project_root / "models").glob("*"))
-        print(f"      └─ ✓ EXECUTADO ({len(files)} arquivos criados)")
+    print("      - Entradas: 8 arquivos CSV brutos")
+    print("      - Saidas: data/processed/interactions.parquet")
+    if (project_root / "data" / "processed" / "interactions.parquet").exists():
+        size_kb = (project_root / "data" / "processed" / "interactions.parquet").stat().st_size / 1024
+        print(f"      [OK] interactions.parquet existe ({size_kb:.1f} KB)")
     else:
-        print("      └─ ⏳ PENDENTE (execute: dvc repro --single-stage train)")
-    
-    print("\n   3. evaluate  (src/model_evaluation.py)")
-    print("      └─ Entradas: data/processed/* + models/*")
-    print("      └─ Saídas: artifacts/ (visualizações + relatório)")
-    if (project_root / "artifacts").exists() and list((project_root / "artifacts").glob("*")):
-        files = list((project_root / "artifacts").glob("*"))
-        print(f"      └─ ✓ EXECUTADO ({len(files)} arquivos criados)")
+        print("      [PENDENTE] Execute: dvc repro --single-stage prepare")
+
+    print("\n   2. featurize (src/feature_engineering.py)")
+    print("      - Entradas: data/processed/interactions.parquet")
+    print("      - Saidas: data/processed/interactions_fe.parquet + id_mappings.json")
+    if (project_root / "data" / "processed" / "interactions_fe.parquet").exists():
+        size_kb = (project_root / "data" / "processed" / "interactions_fe.parquet").stat().st_size / 1024
+        print(f"      [OK] interactions_fe.parquet existe ({size_kb:.1f} KB)")
     else:
-        print("      └─ ⏳ PENDENTE (execute: dvc repro --single-stage evaluate)")
-    
+        print("      [PENDENTE] Execute: dvc repro --single-stage featurize")
+
+    print("\n   3. validate  (validacao de shape)")
+    print("      - Entradas: data/processed/interactions_fe.parquet")
+    print("      - Validacao: shape == (99785, 42)")
+    print("      [OK] Stage inline no dvc.yaml")
+
     # 3. Verificar dados processados
-    print("\n✅ DADOS PROCESSADOS:")
+    print("\nDADOS PROCESSADOS:")
     processed_dir = project_root / "data" / "processed"
     if processed_dir.exists():
         files = list(processed_dir.glob("*"))
         for file in sorted(files):
             size_kb = file.stat().st_size / 1024
-            print(f"   ✓ {file.name:25} ({size_kb:.1f} KB)")
-        
-        # Carregar metadata
-        metadata_file = processed_dir / "metadata.json"
-        if metadata_file.exists():
-            with open(metadata_file) as f:
-                metadata = json.load(f)
-                print(f"\n   Dataset Summary:")
-                print(f"   ├─ Treino: {metadata.get('n_samples_train', 'N/A')} amostras × {metadata.get('n_features', 'N/A')} features")
-                print(f"   ├─ Teste:  {metadata.get('n_samples_test', 'N/A')} amostras")
-                print(f"   └─ Features: {metadata.get('n_features', 'N/A')}")
-    
-    # 4. Verificar modelos
-    print("\n✅ MODELOS TREINADOS:")
-    models_dir = project_root / "models"
-    if models_dir.exists():
-        model_files = list(models_dir.glob("*_model.pkl"))
-        if model_files:
-            for model_file in sorted(model_files):
-                print(f"   ✓ {model_file.name}")
-        else:
-            print("   ⏳ Nenhum modelo encontrado")
+            print(f"   {file.name:35} ({size_kb:.1f} KB)")
+
+    # 4. Treinamento (train.py standalone)
+    print("\nTREINAMENTO (scripts independentes do DVC):")
+    print("   - src/train.py: Baselines de recomendacao (Popularity, Top-Rated, Item-CF)")
+    if (project_root / "src" / "train.py").exists():
+        print("   [OK] train.py existe")
+        print("   [PENDENTE] Execute: uv run python src/train.py")
     else:
-        print("   📁 Diretório 'models/' não existe ainda")
-    
-    # 5. Verificar artefatos
-    print("\n✅ ARTEFATOS FINAIS:")
-    artifacts_dir = project_root / "artifacts"
-    if artifacts_dir.exists():
-        files = list(artifacts_dir.glob("*"))
-        for file in sorted(files):
-            print(f"   ✓ {file.name}")
-    else:
-        print("   📁 Diretório 'artifacts/' não existe ainda")
-    
-    # 6. Configuração remota
-    print("\n✅ CONFIGURAÇÃO REMOTA:")
-    dvc_config = project_root / ".dvc" / "config"
-    if dvc_config.exists():
-        with open(dvc_config) as f:
-            content = f.read()
-            if "local_storage" in content:
-                print("   ✓ Remote storage configurado: C:\\dvc_storage\\pos-ml-eng-tech")
-                print("   ✓ Status: ATIVO (padrão)")
-    
-    # 7. Instruções para completar
-    print("\n📋 PRÓXIMOS PASSOS:")
-    print("   1. Continuar/Completar pipeline:")
-    print("      → dvc repro")
-    print("\n   2. Ou executar estágio específico:")
-    print("      → dvc repro --single-stage train")
-    print("      → dvc repro --single-stage evaluate")
-    print("\n   3. Ver status:")
-    print("      → dvc status")
-    print("      → dvc dag")
-    print("\n   4. Sincronizar com remoto:")
-    print("      → dvc push")
-    print("      → dvc pull")
-    
-    print("\n" + "="*70)
-    print("Para mais informações, veja: DVC_PIPELINE.md")
-    print("="*70 + "\n")
+        print("   [ERRO] train.py nao encontrado")
+
+    # 5. Instruções para completar
+    print("\nPROXIMOS PASSOS:")
+    print("   1. Executar pipeline DVC:")
+    print("      -> dvc repro")
+    print("   2. Executar treinamento de modelos:")
+    print("      -> uv run python src/train.py")
+    print("   3. Ver status DVC:")
+    print("      -> dvc status")
+    print("      -> dvc dag")
+    print("   4. MLflow tracking (inicie em outro terminal):")
+    print("      -> mlflow ui --host 127.0.0.1 --port 5000")
+
+    print("\n" + "=" * 70)
+    print("Pipeline DVC: prepare -> featurize -> validate")
+    print("Pipeline de Modelos: src/train.py (standalone)")
+    print("=" * 70 + "\n")
+
 
 if __name__ == "__main__":
     check_dvc_status()

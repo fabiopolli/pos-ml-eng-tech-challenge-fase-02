@@ -2,9 +2,9 @@
 Olist Dataset Preparation Pipeline for Recommendation System.
 """
 
-from pathlib import Path
 import importlib
 import logging
+from pathlib import Path
 
 import pandas as pd
 
@@ -31,9 +31,7 @@ def resolve_data_dir() -> Path:
     if raw_dir.exists():
         return raw_dir
 
-    logger.warning(
-        f"Directory {raw_dir} not found. Falling back to {data_dir}."
-    )
+    logger.warning(f"Directory {raw_dir} not found. Falling back to {data_dir}.")
     return data_dir
 
 

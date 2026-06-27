@@ -378,10 +378,13 @@ def select_final_features(df: pd.DataFrame) -> pd.DataFrame:
     ]
 
     # Remove price_log if correlation with price > 0.95
-    if "price" in df.columns and "price_log" in df.columns:
-        if df[["price", "price_log"]].corr().iloc[0, 1] > 0.95:
-            final_cols.remove("price_log")
-            logger.info("Removed 'price_log' due to > 0.95 correlation with 'price'")
+    if (
+        "price" in df.columns
+        and "price_log" in df.columns
+        and df[["price", "price_log"]].corr().iloc[0, 1] > 0.95
+    ):
+        final_cols.remove("price_log")
+        logger.info("Removed 'price_log' due to > 0.95 correlation with 'price'")
 
     df_final = df[final_cols].copy()
 
