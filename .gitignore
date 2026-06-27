@@ -75,6 +75,7 @@ data/raw/*
 data/processed/*
 !data/processed/.gitkeep
 !data/processed/*.parquet.dvc
+data/*.csv
 models/*
 !models/.gitkeep
 
@@ -82,7 +83,11 @@ models/*
 *.parquet
 *.pkl
 *.joblib
+
+# PyTorch models (binários grandes)
 *.pt
+artifacts/ncf_*.pt
+artifacts/*.pkl
 *.pth
 *.bin
 *.h5

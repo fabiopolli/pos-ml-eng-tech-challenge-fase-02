@@ -1,0 +1,29 @@
+embedding_features:
+- user_id
+- product_id_idx
+- category_id
+numeric_features:
+- price_log
+- freight_value_log
+- price_to_freight_ratio
+- has_price_outlier
+- days_since_reference
+- is_weekend
+- is_holiday_season
+- category_target_enc
+- category_frequency
+- payment_type_credit_card
+- payment_type_boleto
+- payment_type_voucher
+- payment_type_debit_card
+- user_total_purchases
+- user_avg_freight
+- user_purchase_span_days
+- user_recency_days
+- product_popularity
+- product_avg_review_score
+- product_review_rate
+n_users: 93358
+n_items: 32216
+n_categories: 72
+target: implicit_feedback

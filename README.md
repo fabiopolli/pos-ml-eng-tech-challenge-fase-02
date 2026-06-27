@@ -25,8 +25,9 @@ Este projeto implementa um sistema de recomendação end-to-end utilizando o dat
 - [x] 3 Baselines implementados: Popularidade, Top-Rated, Item-Item CF
 - [x] Métricas reais de ranking (MAP@K, NDCG@K, Recall@K, Precision@K, Hit Rate@K)
 - [x] Split temporal para avaliação (70/15/15)
-- [ ] Modelo NCF com PyTorch + BPR Loss
-- [ ] Tracking MLflow com 3+ runs (servidor requerido)
+- [x] **Modelo NCF com PyTorch + BPR Loss** (Etapa 4 completa)
+- [x] **Tracking MLflow com 6 runs** (3 experimentos: Baseline, Optimization, Ablation)
+- [x] **Modelo registrado no MLflow Model Registry — Production stage**
 - [ ] Dockerfile multi-stage
 - [ ] Deploy em cloud
 - [ ] Model Card
@@ -39,9 +40,8 @@ Este projeto implementa um sistema de recomendação end-to-end utilizando o dat
 | Membro | Responsabilidade |
 |---|---|
 | **Fábio Polli** | Arquitetura, DVC, baseline Item-Item CF |
-| **Bill** | DevOps, dashboard Streamlit, CI/CD |
+| **Bill** | DevOps, dashboard Streamlit, CI/CD, **NCF PyTorch + BPR Loss** |
 | **Denis & Romário** | Pipeline de dados, feature engineering |
-| **TBD** | NCF com PyTorch + BPR Loss |
 
 ---
 
@@ -50,9 +50,18 @@ Este projeto implementa um sistema de recomendação end-to-end utilizando o dat
 ```
 pos-ml-eng-tech-challenge-fase-02/
 ├── src/
-│   ├── data_preparation.py       # Stage 1: ETL (CSVs → interactions.parquet)
-│   ├── feature_engineering.py    # Stage 2: FE (interactions → interactions_fe)
-│   ├── train.py                  # Baselines + MLflow tracking
+│   ├── data/                     # Módulo de dados (PyTorch)
+│   │   ├── dataset.py            # ImplicitFeedbackDataset
+│   │   ├── splits.py             # temporal_split()
+│   │   └── preprocessing.py      # fit_scaler(), transform_features()
+│   ├── models/                   # Módulo de modelos
+│   │   ├── ncf.py                # NCFHybrid (PyTorch)
+│   │   └── losses.py             # BPR Loss
+│   ├── training/                 # Módulo de treino
+│   │   ├── train.py              # Loop de treinamento + MLflow
+│   │   └── evaluate.py           # Métricas @K (NDCG, MAP, HitRate, Recall, Precision)
+│   ├── data_preparation.py       # Stage 1: ETL → interactions.parquet
+│   ├── feature_engineering.py    # Stage 2: FE → interactions_fe.parquet
 │   └── eda.py                    # Análise exploratória
 ├── data/
 │   ├── raw/                      # CSVs originais (versionados via DVC)
@@ -62,26 +71,41 @@ pos-ml-eng-tech-challenge-fase-02/
 │       ├── id_mappings.json      # Mapeamentos para embeddings
 │       └── feature_metadata.json # Metadados das features
 ├── notebooks/
-│   ├── 00_pipeline_explanation.ipynb # Decisões narrativas (para apresentação)
+│   ├── 00_pipeline_explanation.ipynb # Decisões narrativas
 │   ├── 01_eda.ipynb              # EDA sobre interactions.parquet
 │   ├── 02_eda_feature_engineered.ipynb # EDA sobre interactions_fe.parquet
 │   ├── 03_baseline_training.ipynb # Treinamento e resultados dos baselines
-│   └── demo.ipynb                # Demonstração dos baselines no MLflow
+│   └── 04_ncf_training_results.ipynb # Resultados do NCF + otimização
 ├── front/
-│   └── app_vis.py                # Dashboard Streamlit (dark mode premium)
+│   └── app_vis.py                # Dashboard Streamlit (6 abas, dark mode)
 ├── scripts/
+│   ├── train_ncf.py              # Script de treino NCF + MLflow
+│   ├── feature_selection.py      # Análise de correlação + MI
+│   ├── generate_ncf_figures.py   # Gera figuras do notebook
+│   ├── generate_optimization_figure.py # Figuras de comparação de runs
 │   └── check_dvc_status.py       # Status checker do pipeline DVC
 ├── reports/
 │   ├── eda_report.md             # Relatório de EDA
-│   └── figures/                  # 20 visualizações do EDA
-├── docs/
-│   ├── GUIDE.md                  # Guia técnico de modelagem
-│   ├── ML_EXECUTION_GUIDE.md     # Passo-a-passo de execução
-│   ├── REPORT.md                 # Relatório de progresso
-│   └── DVC_REMOTE_SETUP.md      # Configuração DVC
-├── CHECKLIST.md                  # Checklist completo do projeto
+│   ├── ncf_optimization_report.md # Relatório de otimização (Etapa 4)
+│   ├── feature_selection_report.md # Análise de feature selection
+│   └── figures/                  # 20+ visualizações do EDA + NCF
+├── artifacts/                    # Artefatos do modelo
+│   ├── ncf_final.pt              # Modelo NCF Production (16.1 MB)
+│   ├── metrics_*.json            # Métricas de cada run
+│   ├── scaler.pkl                # StandardScaler ajustado
+│   └── mlflow.db                 # Tracking SQLite do MLflow
+├── configs/
+│   ├── selected_features.yaml    # 20 features numéricas + 3 embedding
+│   └── ncf_best.yaml             # Hiperparâmetros do modelo Production
 ├── tests/
 │   └── test_import.py            # Teste de imports
+├── docs/
+│   ├── GUIDE.md                  # Guia técnico de modelagem
+│   ├── REPORT.md                 # Relatório de progresso detalhado
+│   ├── NCF_IMPLEMENTATION_PLAN.md # Plano de implementação NCF
+│   ├── CHECKLIST.md              # Checklist de entregas
+│   └── DVC_REMOTE_SETUP.md       # Configuração DVC
+├── CHECKLIST.md                  # Checklist completo do projeto
 ├── pyproject.toml                # Dependências (uv/Poetry)
 ├── dvc.yaml                      # Pipeline DVC (3 estágios)
 └── README.md
@@ -138,11 +162,18 @@ uv run python src/feature_engineering.py
 # 5. Treinar baselines
 uv run python src/train.py
 
-# 6. Dashboard (em outro terminal)
+# 6. Treinar NCF (PyTorch) — Modelo Production já disponível
+uv run python scripts/train_ncf.py --epochs 15 --emb-dim 32 --hidden 64 32 \
+    --dropout 0.5 --lr 5e-4 --batch-size 2048 --n-negatives 8 \
+    --use-scheduler --weight-decay 5e-4 \
+    --run-name "Ablation_FINAL_no_aux_emb32" \
+    --experiment-name "Olist_NCF_Optimization"
+
+# 7. Dashboard (em outro terminal)
 uv run streamlit run front/app_vis.py
 
-# 7. MLflow UI (em outro terminal)
-mlflow ui --host 127.0.0.1 --port 5000
+# 8. MLflow UI (em outro terminal)
+uv run mlflow ui --backend-store-uri sqlite:///./artifacts/mlflow.db
 ```
 
 ---
@@ -224,12 +255,13 @@ O dashboard [`front/app_vis.py`](front/app_vis.py) segue o mesmo padrão visual 
 uv run streamlit run front/app_vis.py
 ```
 
-**Abas:**
+**Abas (6 total):**
 1. **📊 Visão Geral** — KPIs, distribuições, temporal, sparsity
 2. **🔧 Feature Engineering** — Mapa de features, correlações
-3. **�️ Resultados do Treinamento** — Métricas dos baselines, análise, gráficos
-4. **�🎯 Recomendações** — Top-N dos baselines (quando disponíveis)
-5. **ℹ️ Sobre o Pipeline** — Arquitetura e decisões
+3. **🏋️ Baselines** — Métricas dos baselines clássicos
+4. **🧠 NCF (MLP PyTorch)** — Resultados do modelo neural, hiperparâmetros, MLflow runs ⭐
+5. **🎯 Recomendações** — Top-N dos baselines (quando disponíveis)
+6. **ℹ️ Sobre o Pipeline** — Arquitetura e decisões
 
 ---
 

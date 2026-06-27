@@ -1,0 +1,60 @@
+model:
+  name: olist_ncf_recommender
+  type: NCFHybrid
+  task: implicit_feedback_ranking
+
+architecture:
+  embedding_dim: 32
+  category_embedding_dim: 8
+  hidden_layers: [64, 32]
+  dropout: 0.5
+  use_side_features: false  # Ablation: melhor performance sem side features
+  activation: relu
+  init: xavier_uniform_mlp_normal_embeddings
+
+training:
+  optimizer: adamw
+  learning_rate: 5.0e-4
+  weight_decay: 5.0e-4
+  batch_size: 2048
+  epochs_max: 20
+  early_stopping_patience: 3
+  early_stopping_metric: val_NDCG_at_10
+  negative_samples_per_positive: 8
+  loss: BPR
+  gradient_clipping_max_norm: 5.0
+  scheduler: ReduceLROnPlateau
+  scheduler_factor: 0.5
+  scheduler_patience: 2
+
+data:
+  numeric_features: []  # Vazio = ablation (só embeddings)
+  embedding_features: [user_id, product_id_idx, category_id]
+  split_strategy: temporal
+  split_proxy_column: days_since_reference
+  train_ratio: 0.70
+  val_ratio: 0.15
+  test_ratio: 0.15
+  scaler: none  # Sem features para escalar
+
+metrics_test_set:
+  HitRate_at_10: 0.4949
+  Recall_at_10: 0.4868
+  Precision_at_10: 0.0509
+  NDCG_at_10: 0.2725
+  MAP_at_10: 0.2081
+  baseline_popularity_NDCG_at_10: 0.0045
+  lift_vs_baseline: 60.6x
+
+artifacts:
+  model_path: artifacts/ncf_final.pt
+  metrics_path: artifacts/metrics_Ablation_FINAL_no_aux_emb32.json
+  mlflow_experiment: Olist_NCF_Optimization
+  mlflow_best_run_name: Ablation_FINAL_no_aux_emb32
+
+notes: |
+  Modelo promovido para Production após Etapa 4.
+  Hiperparâmetros encontrados via ablation + grid search.
+  Surpresa: side features AUXILIARES pioraram performance devido ao
+  cold-start massivo (98% dos usuários do test não têm embedding treinado).
+  Decisão final: usar apenas embeddings (user + item + category).

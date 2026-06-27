@@ -382,9 +382,11 @@ O ganho informacional das novas variáveis de agregação enriqueceu decisivamen
 | Acompanhar ao menos 4 métricas (Recall, NDCG, MAP, Hit Rate) | ✅ Concluído (MAP@K, NDCG@K, Precision@K, Recall@K, HitRate@K) |
 | Registrar um patamar mínimo de 3 execuções com MLflow | ⚠️ Framework configurado, servidor requerido |
 | Estabelecer quantitativamente 3 módulos rastreados do DVC | ✅ Concluído (prepare, featurize, validate) |
-| Produzir base do modelo implementado através de redes em PyTorch | 🔄 Em desenvolvimento |
+| Produzir base do modelo implementado através de redes em PyTorch | ✅ Concluído (NCF Hybrid + BPR Loss) |
 | Gerar pontos comparativos com o Scikit-Learn | ✅ Concluído (Popularity, TopRated, ItemItemCF) |
 | Split temporal para avaliação | ✅ Concluído (70/15/15) |
+| 6 runs MLflow registradas (≥ 3 mínimo) | ✅ Concluído (3 experimentos: Baseline, Optimization, Ablation) |
+| Modelo registrado no MLflow Model Registry | ✅ Concluído (olist_ncf_recommender v1 → Production) |
 | Disponibilizar infraestrutura serverless/endpoint em Cloud pública | ⏳ Pendente |
 | Organizar elaboração teórica com Model Card e Pitches do tipo STAR | ⏳ Pendente |
 
@@ -397,18 +399,20 @@ O ganho informacional das novas variáveis de agregação enriqueceu decisivamen
 2.  **Desenvolvimento do Baseline:** Codificados 3 algoritmos (Popularity, TopRated, ItemItemCF) em `src/train.py`.
 3.  **Métricas de Ranking:** Implementadas MAP@K, NDCG@K, Precision@K, Recall@K, HitRate@K em `src/train.py`.
 4.  **Pipeline DVC:** 3 estágios configurados (prepare, featurize, validate).
-5.  **Dashboard Streamlit:** 5 abas implementadas em `front/app_vis.py`.
+5.  **Dashboard Streamlit:** 6 abas implementadas em `front/app_vis.py` (inclui NCF).
 6.  **Notebook de Resultados:** `notebooks/03_baseline_training.ipynb` criado.
-
-### 🔄 Em Desenvolvimento
-1.  **Arquitetura PyTorch (NCF):** Implementação do modelo neural com embeddings e BPR Loss.
+7.  **NCF com PyTorch + BPR Loss:** Modelo NCFHybrid completo em `src/models/ncf.py`.
+8.  **6 Runs MLflow:** Experimentos Baseline, Optimization e Ablation com variação de HPs.
+9.  **Modelo Production:** `olist_ncf_recommender v1` registrado e promovido no MLflow Model Registry.
+10. **Otimização (Etapa 4):** 5 runs com variação de HPs + ablation study. Melhor: **NDCG@10 = 0.2725** (60× vs baseline).
+11. **Notebook NCF:** `notebooks/04_ncf_training_results.ipynb` com análise completa.
+12. **Relatório de Otimização:** `reports/ncf_optimization_report.md` com findings.
 
 ### ⏳ Pendentes
-1.  **Integração MLflow:** Iniciar servidor `mlflow ui --port 5000` e registrar runs.
-2.  **Containerização:** Preparar o Dockerfile multi-stage de produção.
-3.  **Implementação em Cloud:** Deploy em AWS/GCP/Azure com endpoint público.
-4.  **Model Card:** Documentação formal de métricas e limitações.
-5.  **Vídeo STAR:** Apresentação de 5 minutos para a banca.
+1.  **Containerização:** Preparar o Dockerfile multi-stage de produção.
+2.  **Implementação em Cloud:** Deploy em AWS/GCP/Azure com endpoint público.
+3.  **Model Card:** Documentação formal de métricas e limitações.
+4.  **Vídeo STAR:** Apresentação de 5 minutos para a banca.
 
 ---
 
@@ -438,14 +442,28 @@ uv run dvc status          # Verificar status
 uv run python src/train.py  # Executa todos os baselines com métricas
 ```
 
+**Treinamento NCF (PyTorch):**
+```bash
+# Run baseline (emb=16, 2 layers, lr=5e-4)
+uv run python scripts/train_ncf.py --epochs 12 --emb-dim 16 --hidden 64 32 \
+    --batch-size 1024 --lr 5e-4 --n-negatives 4 --no-mlflow
+
+# Run de otimização (melhor modelo Production)
+uv run python scripts/train_ncf.py --epochs 20 --emb-dim 32 --hidden 64 32 \
+    --dropout 0.5 --lr 5e-4 --batch-size 2048 --n-negatives 8 \
+    --use-scheduler --weight-decay 5e-4 \
+    --run-name "Ablation_FINAL_no_aux_emb32" \
+    --experiment-name "Olist_NCF_Optimization"
+```
+
 **Dashboard Streamlit:**
 ```bash
 uv run streamlit run front/app_vis.py  # Abre em http://localhost:8501
 ```
 
-**MLflow (requer servidor):**
+**MLflow UI (tracking local SQLite):**
 ```bash
-mlflow ui --host 127.0.0.1 --port 5000
+uv run mlflow ui --backend-store-uri sqlite:///./artifacts/mlflow.db
 ```
 
 **Execução de Testes:**
