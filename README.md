@@ -23,9 +23,10 @@ Este projeto implementa um sistema de recomendação end-to-end utilizando o dat
 - [x] Pipeline de dados com DVC (3 estágios: prepare → featurize → validate)
 - [x] Feature Engineering (10 → 42 features)
 - [x] 3 Baselines implementados: Popularidade, Top-Rated, Item-Item CF
+- [x] Métricas reais de ranking (MAP@K, NDCG@K, Recall@K, Precision@K, Hit Rate@K)
+- [x] Split temporal para avaliação (70/15/15)
 - [ ] Modelo NCF com PyTorch + BPR Loss
-- [ ] Métricas reais de ranking (NDCG@K, Recall@K, MAP@K, Hit Rate@K)
-- [ ] Tracking MLflow com 3+ runs
+- [ ] Tracking MLflow com 3+ runs (servidor requerido)
 - [ ] Dockerfile multi-stage
 - [ ] Deploy em cloud
 - [ ] Model Card
@@ -64,6 +65,7 @@ pos-ml-eng-tech-challenge-fase-02/
 │   ├── 00_pipeline_explanation.ipynb # Decisões narrativas (para apresentação)
 │   ├── 01_eda.ipynb              # EDA sobre interactions.parquet
 │   ├── 02_eda_feature_engineered.ipynb # EDA sobre interactions_fe.parquet
+│   ├── 03_baseline_training.ipynb # Treinamento e resultados dos baselines
 │   └── demo.ipynb                # Demonstração dos baselines no MLflow
 ├── front/
 │   └── app_vis.py                # Dashboard Streamlit (dark mode premium)
@@ -225,8 +227,9 @@ uv run streamlit run front/app_vis.py
 **Abas:**
 1. **📊 Visão Geral** — KPIs, distribuições, temporal, sparsity
 2. **🔧 Feature Engineering** — Mapa de features, correlações
-3. **🎯 Recomendações** — Top-N dos baselines (quando disponíveis)
-4. **ℹ️ Sobre o Pipeline** — Arquitetura e decisões
+3. **�️ Resultados do Treinamento** — Métricas dos baselines, análise, gráficos
+4. **�🎯 Recomendações** — Top-N dos baselines (quando disponíveis)
+5. **ℹ️ Sobre o Pipeline** — Arquitetura e decisões
 
 ---
 

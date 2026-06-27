@@ -47,6 +47,10 @@ Este projeto foca no desenvolvimento end-to-end de um Sistema de Recomendação 
 | 2026-06-18 | 1 | Pipeline de preparação de dados | ✅ | src/data_preparation.py + interactions.parquet |
 | 2026-06-18 | 2 | Configuração do ambiente Python (uv) | ✅ | pyproject.toml + uv.lock + .venv |
 | 2026-06-18 | 2 | Feature Engineering + correção cold-start | ✅ | src/feature_engineering.py + interactions_fe.parquet |
+| 2026-06-27 | 3 | Treinamento de Baselines | ✅ | src/train.py + split temporal + métricas reais |
+| 2026-06-27 | 3 | Dashboard Streamlit (Resultados) | ✅ | front/app_vis.py (5 abas) |
+| 2026-06-27 | 3 | Notebook de Resultados | ✅ | notebooks/03_baseline_training.ipynb |
+| 2026-06-27 | 3 | Documentação e Correções | ✅ | README.md + REPORT.md atualizados |
 
 ---
 
@@ -374,28 +378,37 @@ O ganho informacional das novas variáveis de agregação enriqueceu decisivamen
 
 | Requisito do Tech Challenge | Status |
 |---|---|
-| Manter no mínimo 10.000 interações user-item na base final | ✓ Concluído (99.785 processadas) |
-| Acompanhar ao menos 4 métricas (Recall, NDCG, MAP, Hit Rate) | ✗ A Fazer |
-| Registrar um patamar mínimo de 3 execuciones com MLflow | ✗ A Fazer |
-| Estabelecer quantitativamente 3 módulos rastreados do DVC | ✗ A Fazer |
-| Produzir base do modelo implementado através de redes em PyTorch | ✗ A Fazer |
-| Gerar pontos comparativos com o Scikit-Learn | ✗ A Fazer |
-| Disponibilizar infraestrutura serverless/endpoint em Cloud pública | ✗ A Fazer |
-| Organizar elaboração teórica com Model Card e Pitches do tipo STAR | ✗ A Fazer |
+| Manter no mínimo 10.000 interações user-item na base final | ✅ Concluído (99.785 processadas) |
+| Acompanhar ao menos 4 métricas (Recall, NDCG, MAP, Hit Rate) | ✅ Concluído (MAP@K, NDCG@K, Precision@K, Recall@K, HitRate@K) |
+| Registrar um patamar mínimo de 3 execuções com MLflow | ⚠️ Framework configurado, servidor requerido |
+| Estabelecer quantitativamente 3 módulos rastreados do DVC | ✅ Concluído (prepare, featurize, validate) |
+| Produzir base do modelo implementado através de redes em PyTorch | 🔄 Em desenvolvimento |
+| Gerar pontos comparativos com o Scikit-Learn | ✅ Concluído (Popularity, TopRated, ItemItemCF) |
+| Split temporal para avaliação | ✅ Concluído (70/15/15) |
+| Disponibilizar infraestrutura serverless/endpoint em Cloud pública | ⏳ Pendente |
+| Organizar elaboração teórica com Model Card e Pitches do tipo STAR | ⏳ Pendente |
 
 ---
 
 ## 10. Próximas Etapas
 
-1.  **Split Temporal Consistente:** Estabelecer uma divisão Treino/Validação/Teste baseada em janelas de tempo, para evitar totalmente o data leakage.
-2.  **Desenvolvimento do Baseline:** Codificar algoritmos primários baseados em regras (Popularidade) e filtragem colaborativa tradicional (Scikit-Learn).
-3.  **Arquitetura PyTorch (MLP/Embeddings):** Levantar os contornos primários do motor neural principal focado no rankeamento (Matrix Factorization ou MLP profundo).
-4.  **Integração e Rastreabilidade MLflow:** Amarrar todas as execuções de modelo à biblioteca para garantir pelo menos os 3 logs requeridos pelo desafio.
-5.  **Pipeline DVC:** Fixar formalmente as etapas de `prepare`, `train` e `evaluate` no formato de estágios sequenciais.
-6.  **Containerização:** Preparar o Dockerfile de produção para facilitar o hand-off de backend.
-7.  **Implementação em Cloud:** Configurar os scripts de deploy numa infra AWS, Azure ou GCP com endpoints REST funcionais.
-8.  **Elaboração do Model Card:** Discorrer sobre métricas, premissas de negócio e limitações teóricas e práticas do ranker.
-9.  **Gravação do Pitch em Vídeo (STAR):** Sintetizar todos os esforços na apresentação obrigatória da banca avaliadora.
+### ✅ Já Concluídos
+1.  **Split Temporal Consistente:** Implementado em `src/train.py` (70% treino / 15% validação / 15% teste).
+2.  **Desenvolvimento do Baseline:** Codificados 3 algoritmos (Popularity, TopRated, ItemItemCF) em `src/train.py`.
+3.  **Métricas de Ranking:** Implementadas MAP@K, NDCG@K, Precision@K, Recall@K, HitRate@K em `src/train.py`.
+4.  **Pipeline DVC:** 3 estágios configurados (prepare, featurize, validate).
+5.  **Dashboard Streamlit:** 5 abas implementadas em `front/app_vis.py`.
+6.  **Notebook de Resultados:** `notebooks/03_baseline_training.ipynb` criado.
+
+### 🔄 Em Desenvolvimento
+1.  **Arquitetura PyTorch (NCF):** Implementação do modelo neural com embeddings e BPR Loss.
+
+### ⏳ Pendentes
+1.  **Integração MLflow:** Iniciar servidor `mlflow ui --port 5000` e registrar runs.
+2.  **Containerização:** Preparar o Dockerfile multi-stage de produção.
+3.  **Implementação em Cloud:** Deploy em AWS/GCP/Azure com endpoint público.
+4.  **Model Card:** Documentação formal de métricas e limitações.
+5.  **Vídeo STAR:** Apresentação de 5 minutos para a banca.
 
 ---
 
@@ -413,6 +426,28 @@ uv run python3 src/data_preparation.py
 uv run python3 src/feature_engineering.py
 ```
 
+**Pipeline DVC:**
+```bash
+uv run dvc repro           # Executar pipeline completo
+uv run dvc pull            # Baixar dados versionados
+uv run dvc status          # Verificar status
+```
+
+**Treinamento de Baselines:**
+```bash
+uv run python src/train.py  # Executa todos os baselines com métricas
+```
+
+**Dashboard Streamlit:**
+```bash
+uv run streamlit run front/app_vis.py  # Abre em http://localhost:8501
+```
+
+**MLflow (requer servidor):**
+```bash
+mlflow ui --host 127.0.0.1 --port 5000
+```
+
 **Execução de Testes:**
 ```bash
 uv run pytest -v
@@ -424,24 +459,57 @@ uv run ruff check . --fix
 uv run ruff format .
 ```
 
-**Visualização de Diretórios (Opcional):**
-```bash
-tree src/ data/ -L 2
-```
-
 ---
 
 ## 12. Conclusão Geral
-A Fase 02 encerra o pilar fundacional e analítico deste projeto com absoluto sucesso ao prover uma infraestrutura metodológica resiliente, ultrapassando amplamente o requisito mínimo de 10.000 amostras (alcançando o marco validado de 99.785 interações processadas). O ambiente local encontra-se devidamente isolado sob diretrizes rigorosas da ferramenta `uv`, garantindo total reprodutibilidade. Com a higienização massiva, os tratamentos de valores atípicos e o enriquecimento de contexto através de um acervo conciso de 42 features dimensionais limpas e coesas finalizados de maneira iterativa, a esteira de dados encontra-se madura. Este alicerce consolida de modo estruturado o terreno para as etapas iminentes de treinamento estocástico, monitorado continuamente via MLflow, focando prioritariamente na experimentação das arquiteturas basais e na construção direta do modelo robusto via embeddings providos nativamente através do framework PyTorch.
+
+A Fase 02 do projeto encontra-se em **avançado estado de maturidade**, com os pilares fundamentais plenamente consolidados:
+
+### ✅ Estrutura de Dados
+- Pipeline DVC com 3 estágios funcionais
+- 99.785 interações processadas (muito acima do mínimo de 10.000)
+- 42 features engenheiradas
+- Split temporal implementado (70/15/15)
+
+### ✅ Modelagem Baseline
+- 3 algoritmos implementados (Popularity, TopRated, ItemItemCF)
+- 5 métricas de ranking calculadas (MAP, NDCG, Precision, Recall, HitRate)
+- Resultados documentados em notebook e dashboard
+
+### ✅ Infraestrutura e Visualização
+- Dashboard Streamlit com 5 abas funcionais
+- Notebooks educacionais para apresentação
+- Documentação atualizada (README, REPORT, GUIDE)
+
+### 🔄 Próximos Passos
+- Implementação do modelo NCF com PyTorch
+- Integração com MLflow (servidor)
+- Deploy em cloud
+- Model Card e vídeo STAR
+
+O projeto está preparado para a fase de modelagem neural avançada e apresentação final.
 
 ---
 
 ## 13. Referências
 
-*   [Script de Preparação de Dados (src/data_preparation.py)](./src/data_preparation.py)
-*   [Script de Análise Exploratória (src/eda.py)](./src/eda.py)
-*   [Script de Feature Engineering (src/feature_engineering.py)](./src/feature_engineering.py)
-*   [Relatório da EDA (reports/eda_report.md)](./reports/eda_report.md)
-*   [Documentação do Processamento de Dados (data/processed/README.md)](./data/processed/README.md)
-*   [Dicionário de Features (data/processed/FEATURES.md)](./data/processed/FEATURES.md)
-*   [Proposta Inicial do Projeto (propostaV1.md)](./propostaV1.md)
+### Scripts Principais
+*   [Script de Preparação de Dados (src/data_preparation.py)](../src/data_preparation.py)
+*   [Script de Análise Exploratória (src/eda.py)](../src/eda.py)
+*   [Script de Feature Engineering (src/feature_engineering.py)](../src/feature_engineering.py)
+*   [Script de Treinamento (src/train.py)](../src/train.py)
+
+### Documentação
+*   [Relatório da EDA (reports/eda_report.md)](../reports/eda_report.md)
+*   [Documentação do Processamento de Dados (data/processed/README.md)](../data/processed/README.md)
+*   [Dicionário de Features (data/processed/FEATURES.md)](../data/processed/FEATURES.md)
+*   [Guia Técnico (docs/GUIDE.md)](./GUIDE.md)
+
+### Notebooks
+*   [Pipeline Explicativo (notebooks/00_pipeline_explanation.ipynb)](../notebooks/00_pipeline_explanation.ipynb)
+*   [EDA (notebooks/01_eda.ipynb)](../notebooks/01_eda.ipynb)
+*   [EDA Feature Engineered (notebooks/02_eda_feature_engineered.ipynb)](../notebooks/02_eda_feature_engineered.ipynb)
+*   [Resultados Baseline (notebooks/03_baseline_training.ipynb)](../notebooks/03_baseline_training.ipynb)
+
+### Dashboard
+*   [Dashboard Streamlit (front/app_vis.py)](../front/app_vis.py)
