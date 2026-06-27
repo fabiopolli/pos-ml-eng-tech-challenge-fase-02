@@ -87,16 +87,23 @@ pos-ml-eng-tech-challenge-fase-02/
 
 ---
 
-## � Pipeline DVC
+## 🏗️ Pipeline DVC
+
+> **Importante:** Todos os comandos DVC devem ser executados com `uv run` para garantir que as dependências do projeto sejam carregadas corretamente.
 
 ```bash
 # Executar pipeline completo
-dvc repro
+uv run dvc repro
 
 # Ou estágios individuais
-dvc repro --single-stage prepare    # data_preparation.py
-dvc repro --single-stage featurize # feature_engineering.py
-dvc repro --single-stage validate  # Validação de shape
+uv run dvc repro --single-stage prepare    # data_preparation.py
+uv run dvc repro --single-stage featurize # feature_engineering.py
+uv run dvc repro --single-stage validate  # Validação de shape
+
+# Outros comandos úteis
+uv run dvc pull      # Baixar dados versionados
+uv run dvc status    # Verificar status do pipeline
+uv run dvc dag       # Visualizar grafo do pipeline
 ```
 
 ### Estágios
@@ -120,7 +127,7 @@ cd pos-ml-eng-tech-challenge-fase-02
 uv sync
 
 # 3. Pull DVC
-dvc pull
+uv run dvc pull
 
 # 4. Executar pipeline
 uv run python src/data_preparation.py
