@@ -214,10 +214,10 @@
 
 ### 3.3 Pré-processamento e Baselines (Scikit-Learn)
 
-- [~] Pipeline de pré-processamento
+- [x] Pipeline de pré-processamento
   - [x] `src/data_preparation.py`
   - [x] `src/feature_engineering.py`
-  - [ ] Limpar/refatorar conforme Clean Code
+  - [x] Limpar/refatorar conforme Clean Code — docstrings preenchidas (`main()`), ruff zero warnings, type hints verificados, SRP documentado em `docs/SRP_RESPONSIBILITIES.md`
 - [x] Baselines de Recomendação (em `src/train.py`)
   - [x] Popularity Baseline
   - [x] Top-Rated Baseline
@@ -308,7 +308,7 @@
 
 ---
 
-## Deploy em Nuvem (AWS / Azure / GCP) · Proposta Fase 4
+## ETAPA 6 — Deploy em Nuvem (AWS / Azure / GCP) · Proposta Fase 4
 
 - [ ] Escolher provedor (AWS / Azure / GCP)
 - [ ] Dockerfile pronto para deploy

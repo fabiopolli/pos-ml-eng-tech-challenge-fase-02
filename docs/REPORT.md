@@ -15,14 +15,17 @@ Este projeto foca no desenvolvimento end-to-end de um Sistema de Recomendação 
 ### 1.2 Stack Tecnológica
 | Categoria | Tecnologia | Versão/Finalidade |
 |---|---|---|
-| **Linguagem** | Python | 3.12 (fixado via uv python pin) |
-| **Gerenciamento de Pacotes** | uv (Astral) | Gestão rápida de dependências e ambientes |
+| **Linguagem** | Python | 3.12+ (fixado via `requires-python` no pyproject.toml) |
+| **Gerenciamento de Pacotes** | uv (Astral) | Gestão rápida de dependências e ambientes — PEP 621 + hatchling |
 | **Deep Learning** | PyTorch | ≥ 2.1 — Implementação de MLP / Embeddings |
-| **Machine Learning Base** | Scikit-Learn | ≥ 1.4 — Modelos de baseline comparativos |
+| **Machine Learning Base** | Scikit-Learn | ≥ 1.4 — Modelos de baseline comparativos (incluindo TruncatedSVD) |
 | **Manipulação de Dados** | Pandas, NumPy, PyArrow | ≥ 2.2, ≥ 1.26, ≥ 15 — Processamento e manipulação ágil |
-| **Tracking e MLOps** | MLflow | ≥ 2.10 — Rastreamento de experimentos e métricas |
+| **Configuração** | Pydantic Settings | ≥ 2.2 — `src/config.py` centraliza paths, MLflow, hiperparâmetros NCF |
+| **Tracking e MLOps** | MLflow | ≥ 2.10 — Rastreamento de experimentos, métricas e Model Registry (Production stage) |
 | **Versionamento de Dados** | DVC | ≥ 3.48 — Versionamento e pipelines de dados |
-| **Engenharia de Software** | Loguru, Ruff, Pytest | ≥ 0.7, ≥ 0.3, ≥ 8 — Logging, lint/format, testes |
+| **Engenharia de Software** | Loguru, Ruff, Pytest | ≥ 0.7, ≥ 0.3, ≥ 8 — Logging, lint zero warnings, testes |
+| **Design Patterns** | Factory + Strategy | `src/models/factory.py` + `src/data/strategies.py` |
+| **Dashboard** | Streamlit, Plotly | ≥ 1.0 — Visualização interativa de resultados |
 | **Infraestrutura** | Docker | Containerização do ambiente (a implementar) |
 | **Cloud** | AWS, Azure ou GCP | Deploy e infraestrutura remota (a definir) |
 

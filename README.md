@@ -1,6 +1,6 @@
 # 🛒 Olist Recommender System
 
-![Python](https://img.shields.io/badge/python-3.10--3.12-blue)
+![Python](https://img.shields.io/badge/python-3.12+-blue)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c)
 ![Scikit-Learn](https://img.shields.io/badge/ScikitLearn-1.3+-f7931e)
 ![MLflow](https://img.shields.io/badge/MLflow-2.5+-0194e2)
@@ -22,12 +22,16 @@ Este projeto implementa um sistema de recomendação end-to-end utilizando o dat
 - [x] ≥ 10.000 interações user-item (99.785 alcançadas)
 - [x] Pipeline de dados com DVC (3 estágios: prepare → featurize → validate)
 - [x] Feature Engineering (10 → 42 features)
-- [x] 3 Baselines implementados: Popularidade, Top-Rated, Item-Item CF
+- [x] **4 Baselines implementados:** Popularidade, Top-Rated, Item-Item CF, **TruncatedSVD**
 - [x] Métricas reais de ranking (MAP@K, NDCG@K, Recall@K, Precision@K, Hit Rate@K)
-- [x] Split temporal para avaliação (70/15/15)
-- [x] **Modelo NCF com PyTorch + BPR Loss** (Etapa 4 completa)
-- [x] **Tracking MLflow com 6 runs** (3 experimentos: Baseline, Optimization, Ablation)
-- [x] **Modelo registrado no MLflow Model Registry — Production stage**
+- [x] Split temporal para avaliação (70/15/15) — com assertions anti-leakage
+- [x] **Modelo NCF com PyTorch + BPR Loss** (Etapa 4 completa, Production: NDCG@10=0.2725)
+- [x] **Tracking MLflow com 11+ runs** (4 baselines + 1 Otimização + 2 Ablation + 1 Auditoria Spearman)
+- [x] **Modelo registrado no MLflow Model Registry — Production stage** (`Ablation_FINAL_no_aux_emb32`)
+- [x] **Configurações centralizadas via pydantic-settings** (`src/config.py`)
+- [x] **Design patterns:** Factory (modelos) + Strategy (preprocessors)
+- [x] **Lint:** Ruff zero warnings em `src/` e `scripts/`
+- [x] **Auditoria Spearman de features redundantes** (relatório em `reports/feature_audit_spearman.md`)
 - [ ] Dockerfile multi-stage
 - [ ] Deploy em cloud
 - [ ] Model Card
@@ -50,18 +54,22 @@ Este projeto implementa um sistema de recomendação end-to-end utilizando o dat
 ```
 pos-ml-eng-tech-challenge-fase-02/
 ├── src/
+│   ├── config.py                 # Configurações centralizadas (pydantic-settings)
 │   ├── data/                     # Módulo de dados (PyTorch)
 │   │   ├── dataset.py            # ImplicitFeedbackDataset
-│   │   ├── splits.py             # temporal_split()
+│   │   ├── splits.py             # temporal_split() com assertions anti-leakage
+│   │   ├── strategies.py         # Strategy Pattern (Temporal vs Random split)
 │   │   └── preprocessing.py      # fit_scaler(), transform_features()
 │   ├── models/                   # Módulo de modelos
 │   │   ├── ncf.py                # NCFHybrid (PyTorch)
-│   │   └── losses.py             # BPR Loss
+│   │   ├── losses.py             # BPR Loss
+│   │   └── factory.py            # Factory Method para instanciar modelos
 │   ├── training/                 # Módulo de treino
-│   │   ├── train.py              # Loop de treinamento + MLflow
+│   │   ├── train.py              # Loop de treinamento + MLflow (baselines + NCF)
 │   │   └── evaluate.py           # Métricas @K (NDCG, MAP, HitRate, Recall, Precision)
 │   ├── data_preparation.py       # Stage 1: ETL → interactions.parquet
-│   ├── feature_engineering.py    # Stage 2: FE → interactions_fe.parquet
+│   ├── feature_engineering.py    # Stage 2: FE → interactions_fe.parquet (18 features)
+│   ├── train.py                  # Treino de 4 baselines clássicos + TruncatedSVD
 │   └── eda.py                    # Análise exploratória
 ├── data/
 │   ├── raw/                      # CSVs originais (versionados via DVC)
@@ -69,7 +77,7 @@ pos-ml-eng-tech-challenge-fase-02/
 │       ├── interactions.parquet  # 99.785 × 10 (user-item)
 │       ├── interactions_fe.parquet # 99.785 × 42 (com features)
 │       ├── id_mappings.json      # Mapeamentos para embeddings
-│       └── feature_metadata.json # Metadados das features
+│       └── feature_metadata.json # Metadados das features + audit_history
 ├── notebooks/
 │   ├── 00_pipeline_explanation.ipynb # Decisões narrativas
 │   ├── 01_eda.ipynb              # EDA sobre interactions.parquet
@@ -80,6 +88,7 @@ pos-ml-eng-tech-challenge-fase-02/
 │   └── app_vis.py                # Dashboard Streamlit (6 abas, dark mode)
 ├── scripts/
 │   ├── train_ncf.py              # Script de treino NCF + MLflow
+│   ├── validate_env.py           # Validador de ambiente (Python, deps, DVC)
 │   ├── feature_selection.py      # Análise de correlação + MI
 │   ├── generate_ncf_figures.py   # Gera figuras do notebook
 │   ├── generate_optimization_figure.py # Figuras de comparação de runs
@@ -87,15 +96,17 @@ pos-ml-eng-tech-challenge-fase-02/
 ├── reports/
 │   ├── eda_report.md             # Relatório de EDA
 │   ├── ncf_optimization_report.md # Relatório de otimização (Etapa 4)
+│   ├── feature_audit_spearman.md # Auditoria Spearman de features redundantes
 │   ├── feature_selection_report.md # Análise de feature selection
 │   └── figures/                  # 20+ visualizações do EDA + NCF
 ├── artifacts/                    # Artefatos do modelo
 │   ├── ncf_final.pt              # Modelo NCF Production (16.1 MB)
+│   ├── baselines/                # CSVs de recomendações dos 4 baselines
 │   ├── metrics_*.json            # Métricas de cada run
 │   ├── scaler.pkl                # StandardScaler ajustado
 │   └── mlflow.db                 # Tracking SQLite do MLflow
 ├── configs/
-│   ├── selected_features.yaml    # 20 features numéricas + 3 embedding
+│   ├── selected_features.yaml    # 18 features numéricas + 3 embedding
 │   └── ncf_best.yaml             # Hiperparâmetros do modelo Production
 ├── tests/
 │   └── test_import.py            # Teste de imports
@@ -103,10 +114,12 @@ pos-ml-eng-tech-challenge-fase-02/
 │   ├── GUIDE.md                  # Guia técnico de modelagem
 │   ├── REPORT.md                 # Relatório de progresso detalhado
 │   ├── NCF_IMPLEMENTATION_PLAN.md # Plano de implementação NCF
+│   ├── NAMING_CONVENTIONS.md     # Convenções de nomenclatura Python
+│   ├── SRP_RESPONSIBILITIES.md   # SRP por módulo (responsabilidades)
 │   ├── CHECKLIST.md              # Checklist de entregas
 │   └── DVC_REMOTE_SETUP.md       # Configuração DVC
 ├── CHECKLIST.md                  # Checklist completo do projeto
-├── pyproject.toml                # Dependências (uv/Poetry)
+├── pyproject.toml                # Dependências (PEP 621 + hatchling)
 ├── dvc.yaml                      # Pipeline DVC (3 estágios)
 └── README.md
 ```
@@ -241,8 +254,8 @@ uv run mlflow ui --backend-store-uri sqlite:///./artifacts/mlflow.db
 
 | Categoria | Tecnologia |
 |---|---|
-| Linguagem | Python 3.10-3.12 |
-| Gerenciador | uv + Poetry |
+| Linguagem | Python 3.12+ |
+| Gerenciador | uv (PEP 621 + hatchling) |
 | Deep Learning | PyTorch ≥ 2.0 |
 | ML Clássico | Scikit-Learn ≥ 1.3 |
 | Dados | Pandas, NumPy, PyArrow |
@@ -263,6 +276,9 @@ uv run mlflow ui --backend-store-uri sqlite:///./artifacts/mlflow.db
 | [`docs/GUIDE.md`](docs/GUIDE.md) | Guia técnico de modelagem (NCF, split temporal, negative sampling) |
 | [`docs/ML_EXECUTION_GUIDE.md`](docs/ML_EXECUTION_GUIDE.md) | Passo-a-passo para executar o pipeline |
 | [`docs/REPORT.md`](docs/REPORT.md) | Relatório detalhado de progresso |
+| [`docs/NAMING_CONVENTIONS.md`](docs/NAMING_CONVENTIONS.md) | Convenções de nomenclatura Python (snake_case, PascalCase, prefixos) |
+| [`docs/SRP_RESPONSIBILITIES.md`](docs/SRP_RESPONSIBILITIES.md) | SRP por módulo (responsabilidades únicas, anti-patterns) |
+| [`reports/feature_audit_spearman.md`](reports/feature_audit_spearman.md) | Auditoria de features redundantes via correlação de Spearman |
 | [`CHECKLIST.md`](CHECKLIST.md) | Checklist completo com status de cada entrega |
 | [`notebooks/00_pipeline_explanation.ipynb`](notebooks/00_pipeline_explanation.ipynb) | Explicação narrativa das decisões (para apresentação) |
 | [`front/app_vis.py`](front/app_vis.py) | Dashboard Streamlit (mesmo padrão do Fase 01) |
@@ -276,7 +292,7 @@ uv run mlflow ui --backend-store-uri sqlite:///./artifacts/mlflow.db
 | **Popularidade** | Produtos mais interagidos | `train_popularity_baseline()` |
 | **Top-Rated** | Produtos com melhor nota média | `train_top_rated_baseline()` |
 | **Item-Item CF** | Similaridade cosseno item-item | `train_item_similarity_baseline()` |
-| **TruncatedSVD** | Próximo a implementar | - |
+| **TruncatedSVD** | Fatoração de matriz via SVD na matriz CSR user-item | `TruncatedSVDBaseline` em `src/train.py` |
 
 ---
 
