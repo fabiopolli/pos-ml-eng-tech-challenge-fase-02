@@ -625,7 +625,62 @@ O projeto está preparado para a fase de modelagem neural avançada e apresenta�
 
 ---
 
-## 13. Referências
+## 13. Validação End-to-End do Pipeline (2026-06-27)
+
+Última execução completa do pipeline, validando que todos os componentes funcionam integrados:
+
+### Pipeline DVC
+```bash
+$ uv run dvc repro
+```
+
+| Stage | Status | Observações |
+|-------|--------|-------------|
+| `prepare` | ✅ OK | 99.785 interações · 93.358 usuários · 32.216 produtos · 72 categorias · sparsity 99,9967% |
+| `featurize` | ✅ OK | 42 colunas geradas · 18 features numéricas · 7 pares altamente correlacionados detectados |
+| `validate` | ✅ OK | shape (99785, 42), < 1000 nulls em review_score |
+
+### Baselines (`uv run python src/train.py`)
+| Model | MAP@10 | NDCG@10 | Recall@10 | HitRate@10 |
+|-------|--------|---------|-----------|------------|
+| PopularityBaseline_K10 | 0.0019 | 0.0053 | 0.0104 | 0.0133 |
+| PopularityBaseline_K20 | 0.0019 | 0.0053 | 0.0104 | 0.0133 |
+| TopRatedBaseline_K10_MinRev5 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |
+| TopRatedBaseline_K10_MinRev15 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |
+| ItemItemCF_K10 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |
+| TruncatedSVD_K10 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |
+
+Cold-start severo (98% dos test users inéditos) explica performance zero em métodos baseados em co-ocorrência.
+
+### Smoke Test NCF (`uv run python scripts/train_ncf.py`)
+Smoke test com config de produção (`ablation-no-aux`, `emb_dim=32`, `hidden=[64,32]`, `dropout=0.5`, `lr=5e-4`) rodado por 5 epochs apenas para validação end-to-end:
+
+| Métrica | Valor | Observação |
+|---------|-------|------------|
+| `test_NDCG@K` | **0.2740** | ≈ Production (0.2725) — valida arquitetura |
+| `test_HitRate@K` | 0.5085 | Top-10 hit ~50% dos test users |
+| `test_MAP@K` | 0.2080 | ≈ Production |
+| `train_HitRate@K` | 0.9900 | Sanity check OK (modelo aprende) |
+| `baseline_NDCG@K` | 0.0045 | Confirma baseline produção em configs/ncf_best.yaml |
+
+Lift vs baseline: 0.2740 / 0.0045 = **60.9x** (Production reporta 60.6x — mesma magnitude).
+
+### Validações Estruturais
+- ✅ `streamlit.testing.AppTest` em `front/app_vis.py`: 0 exceptions, 6 tabs renderizadas, 27 métricas, 4 dataframes
+- ✅ `jupyter nbconvert --execute` em todos os 6 notebooks: 0 erros
+- ✅ MLflow SQLite tracking (`artifacts/mlflow.db`): 4 experimentos, 6 runs finalizadas
+
+### Artefatos Validados
+- `data/processed/interactions.parquet` (5.69 MB)
+- `data/processed/interactions_fe.parquet` (42 cols)
+- `data/processed/baseline_results.csv` (10 modelos avaliados)
+- `artifacts/baselines/recommendations_*.csv` (10 arquivos de top-K)
+- `artifacts/ncf_Ablation_FINAL_no_aux_emb32.pt` (Production, 16 MB)
+- `artifacts/metrics_Ablation_FINAL_no_aux_emb32.json` (métricas canônicas)
+
+---
+
+## 14. Referências
 
 ### Scripts Principais
 *   [Script de Preparação de Dados (src/data_preparation.py)](../src/data_preparation.py)
