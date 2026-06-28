@@ -34,16 +34,20 @@ RAW_DATA_DIR = BASE_DIR / "data"
 INTERACTIONS_PATH = BASE_DIR / "data" / "processed" / "interactions.parquet"
 INTERACTIONS_FE_PATH = BASE_DIR / "data" / "processed" / "interactions_fe.parquet"
 ID_MAPPINGS_PATH = BASE_DIR / "data" / "processed" / "id_mappings.json"
-BASELINE_OUTPUT_PATH = BASE_DIR / "data" / "processed" / "temporary_baseline_recommendations.csv"
 BASELINE_RESULTS_PATH = BASE_DIR / "data" / "processed" / "baseline_results.csv"
 TRAIN_SPLIT_PATH = BASE_DIR / "data" / "processed" / "train_split.parquet"
 TEST_SPLIT_PATH = BASE_DIR / "data" / "processed" / "test_split.parquet"
 FIGURES_DIR = BASE_DIR / "reports" / "figures"
 FEATURES_DOC_PATH = BASE_DIR / "data" / "processed" / "FEATURES.md"
+FEATURE_METADATA_PATH = BASE_DIR / "data" / "processed" / "feature_metadata.json"
 
 # --- Caminhos dos artefatos do NCF (PyTorch) ---
-NCF_MODEL_PATH = BASE_DIR / "artifacts" / "ncf_final.pt"
-NCF_METRICS_PATH = BASE_DIR / "artifacts" / "metrics_Ablation_FINAL_no_aux_emb32.json"
+NCF_MODEL_PRIMARY = BASE_DIR / "artifacts" / "ncf_Ablation_FINAL_no_aux_emb32.pt"
+NCF_MODEL_FALLBACK = BASE_DIR / "artifacts" / "ncf_final.pt"
+NCF_MODEL_PATH = NCF_MODEL_PRIMARY if NCF_MODEL_PRIMARY.exists() else NCF_MODEL_FALLBACK
+NCF_METRICS_PRIMARY = BASE_DIR / "artifacts" / "metrics_Ablation_FINAL_no_aux_emb32.json"
+NCF_METRICS_FALLBACK = BASE_DIR / "artifacts" / "metrics_NCF_FINAL_emb32_h64-32_d0.5_lr5e-4.json"
+NCF_METRICS_PATH = NCF_METRICS_PRIMARY if NCF_METRICS_PRIMARY.exists() else NCF_METRICS_FALLBACK
 NCF_SCALER_PATH = BASE_DIR / "artifacts" / "scaler.pkl"
 NCF_CONFIG_PATH = BASE_DIR / "configs" / "selected_features.yaml"
 NCF_BEST_CONFIG_PATH = BASE_DIR / "configs" / "ncf_best.yaml"
@@ -53,6 +57,9 @@ NCF_FIG_TVT = FIGURES_DIR / "ncf_train_val_test.png"
 NCF_FIG_COLDSTART = FIGURES_DIR / "coldstart_analysis.png"
 NCF_FIG_EMBED = FIGURES_DIR / "embedding_norms.png"
 NCF_FIG_OPTIMIZATION = FIGURES_DIR / "ncf_optimization_comparison.png"
+
+# --- Diretório de recomendacoes geradas pelos baselines ---
+BASELINES_RECS_DIR = BASE_DIR / "artifacts" / "baselines"
 
 # --- Configuração da página ---
 st.set_page_config(
@@ -134,9 +141,45 @@ def load_interactions_fe() -> pd.DataFrame | None:
 
 @st.cache_data
 def load_baseline_outputs() -> pd.DataFrame | None:
-    if BASELINE_OUTPUT_PATH.exists():
-        return pd.read_csv(BASELINE_OUTPUT_PATH)
-    return None
+    """Carrega e empilha as recomendacoes geradas pelos baselines.
+
+    Cada baseline gera arquivos CSV em artifacts/baselines/ no formato
+    recommendations_<Model>_<Variant>_K<N>.csv. Cada arquivo tem:
+      - Linha 1: header com 'top_<N>'
+      - Linhas seguintes: product_id (UUID string) para cada rank
+    """
+    if not BASELINES_RECS_DIR.exists():
+        return None
+
+    files = sorted(BASELINES_RECS_DIR.glob("recommendations_*.csv"))
+    if not files:
+        return None
+
+    frames: list[pd.DataFrame] = []
+    for fp in files:
+        try:
+            # Parse do nome do arquivo: recommendations_<Model>_<Variant>_K<N>.csv
+            stem = fp.stem
+            parts = stem.split("_")
+            k_str = parts[-1]  # K10
+            k = int(k_str.replace("K", ""))
+            model_class = parts[1] if len(parts) > 1 else "Unknown"
+            variant = "_".join(parts[2:-1]) if len(parts) > 3 else ""
+
+            # Header='top_10' — pula a primeira linha
+            df = pd.read_csv(fp, skiprows=1, header=None)
+            df.columns = [f"rank_{i+1}" for i in range(df.shape[1])]
+            df.insert(0, "rank0_user", df.index)
+            df["baseline_model"] = model_class
+            df["variant"] = variant
+            df["k"] = k
+            frames.append(df)
+        except Exception:
+            continue
+
+    if not frames:
+        return None
+    return pd.concat(frames, ignore_index=True)
 
 
 @st.cache_data
@@ -363,23 +406,30 @@ with tabs[0]:
         # Análise de sparsity
         st.markdown("---")
         st.subheader("🕳️ Sparsity da Matriz User-Item")
-        if "customer_unique_id" in df.columns and "product_id" in df.columns:
+        # Preferir IDs inteiros de interactions_fe (mais preciso)
+        if df_fe is not None and "user_id" in df_fe.columns and "product_id_idx" in df_fe.columns:
+            n_users = df_fe["user_id"].nunique()
+            n_items = df_fe["product_id_idx"].nunique()
+        elif "customer_unique_id" in df.columns and "product_id" in df.columns:
             n_users = df["customer_unique_id"].nunique()
             n_items = df["product_id"].nunique()
-            n_interactions = len(df)
-            total = n_users * n_items
-            sparsity = 1 - (n_interactions / total)
+        else:
+            n_users = n_items = n_interactions = 0
+            total = 1
+        n_interactions = len(df) if df is not None else len(df_fe)
+        total = n_users * n_items
+        sparsity = 1 - (n_interactions / total) if total > 0 else 0
 
-            cs1, cs2, cs3 = st.columns(3)
-            cs1.metric("Usuários × Produtos", f"{total:,}")
-            cs2.metric("Interações Reais", f"{n_interactions:,}")
-            cs3.metric("Sparsity", f"{sparsity:.4%}")
+        cs1, cs2, cs3 = st.columns(3)
+        cs1.metric("Usuários × Produtos", f"{total:,}")
+        cs2.metric("Interações Reais", f"{n_interactions:,}")
+        cs3.metric("Sparsity", f"{sparsity:.4%}")
 
-            st.info(
-                "💡 **Interpretação:** Sparsity > 99.99% indica que a maioria dos pares (user, item) "
-                "nunca foram observados. Isso é esperado em e-commerce e justifica o uso de técnicas "
-                "de embeddings e filtragem colaborativa."
-            )
+        st.info(
+            "💡 **Interpretação:** Sparsity > 99.99% indica que a maioria dos pares (user, item) "
+            "nunca foram observados. Isso é esperado em e-commerce e justifica o uso de técnicas "
+            "de embeddings e filtragem colaborativa."
+        )
 
 
 # ============================================================================
@@ -693,18 +743,20 @@ with tabs[2]:
         # Próximos passos
         st.markdown("---")
         st.success(
-            """
+            r"""
             ### ✅ Status dos Entregáveis
-            
+
             | Etapa | Status |
             |-------|--------|
             | Pipeline de dados (DVC) | ✅ Concluído |
             | Feature Engineering (10→42) | ✅ Concluído |
-            | Modelos Baseline | ✅ Concluído |
-            | Métricas reais (MAP, NDCG, etc.) | ✅ Concluído |
-            | Modelo NCF (PyTorch) | 🔄 Em desenvolvimento |
-            | MLflow Tracking | ⚠️ Requer servidor |
-            | Model Registry | ⏳ Pendente |
+            | Baselines (Popularity, TopRated, Item-Item CF, TruncatedSVD) | ✅ Concluído |
+            | Métricas reais (HitRate, Recall, Precision, NDCG, MAP) | ✅ Concluído |
+            | Modelo NCF (PyTorch + BPR) | ✅ Concluído |
+            | MLflow Tracking (SQLite local) | ✅ Concluído |
+            | Ablation Study (no\_aux venceu) | ✅ Concluído |
+            | Modelo em Production (`Ablation_FINAL_no_aux_emb32`) | ✅ Concluído |
+            | Dashboard Streamlit (`front/app_vis.py`) | ✅ Concluído |
             """
         )
 
@@ -723,20 +775,30 @@ if _ncf_available:
         with open(NCF_CONFIG_PATH) as f:
             ncf_config = yaml.safe_load(f)
 
-        # Carregar MLflow tracking (opcional)
+        # Carregar Production config (fonte canonica do modelo em prod)
+        prod_hp: dict = {}
+        if NCF_BEST_CONFIG_PATH.exists():
+            with open(NCF_BEST_CONFIG_PATH) as _hp:
+                prod_hp = yaml.safe_load(_hp) or {}
+
+        # Carregar MLflow tracking (opcional) — busca o melhor run em todos os experimentos
         ncf_mlflow_runs = []
         try:
             import mlflow as _mlflow
 
             _mlflow.set_tracking_uri(f"sqlite:///{NCF_MLFLOW_DB}")
             _client = _mlflow.tracking.MlflowClient()
-            _exp = _client.get_experiment_by_name("Olist_NCF_Baseline")
-            if _exp is not None:
-                ncf_mlflow_runs = _client.search_runs(
-                    experiment_ids=[_exp.experiment_id],
-                    filter_string="status = 'FINISHED'",
-                    order_by=["start_time DESC"],
-                )
+            _exp_ids = [
+                str(e.experiment_id)
+                for e in _client.search_experiments()
+                if e.name != "Default"
+            ]
+            ncf_mlflow_runs = _client.search_runs(
+                experiment_ids=_exp_ids,
+                filter_string="status = 'FINISHED'",
+                order_by=["metrics.test_NDCG_at_K DESC"],
+                max_results=10,
+            )
         except Exception:
             pass
 
@@ -750,11 +812,18 @@ if _ncf_available:
         col5.metric("MAP@10", f"{ncf_metrics['test']['MAP@K']:.4f}")
 
         # Banner de produção
-        st.success(
-            f"🏆 **Modelo em Production** (MLflow Registry) — "
-            f"NDCG@10 = {ncf_metrics['test']['NDCG@K']:.4f} "
-            f"(+{ncf_metrics['test']['NDCG@K'] / 0.0045 * 100 - 100:.0f}% vs baseline)"
-        )
+        baseline_ndcg = ncf_metrics.get("baseline", {}).get("NDCG@K", 0.0045)
+        ncf_ndcg = ncf_metrics['test']['NDCG@K']
+        if baseline_ndcg > 0:
+            lift_pct = (ncf_ndcg / baseline_ndcg - 1) * 100
+            lift_x = ncf_ndcg / baseline_ndcg
+            st.success(
+                f"🏆 **Modelo em Production** (MLflow Registry) — "
+                f"NDCG@10 = {ncf_ndcg:.4f} "
+                f"(**{lift_x:.1f}x** vs baseline, +{lift_pct:.0f}%)"
+            )
+        else:
+            st.success(f"🏆 **Modelo em Production** — NDCG@10 = {ncf_ndcg:.4f}")
 
         st.markdown("---")
 
@@ -835,11 +904,13 @@ if _ncf_available:
 
         # Ablation finding
         st.warning(
-            "🧪 **Achado da Ablation**: As 20 side features **prejudicaram** o modelo final "
-            f"(NDCG 0.2226 → 0.2725 sem features, **+22.5% lift**). "
+            "🧪 **Achado da Ablation**: O modelo **no_aux** (apenas embeddings) superou "
+            "todas as variantes com 20 side features. Decisão: Production = "
+            "`Ablation_FINAL_no_aux_emb32` (NDCG@10 = 0.2725). "
             "Hipótese: com 98% cold-start, os embeddings aleatórios não contribuem, "
             "e as features normalizadas pelo scaler fitado no treino dominam o sinal "
-            "de forma homogênea entre usuários."
+            "de forma homogênea entre usuários — empurrando todos os scores para a "
+            "mesma região e prejudicando o ranqueamento."
         )
 
         st.markdown("---")
@@ -850,45 +921,53 @@ if _ncf_available:
             st.image(str(NCF_FIG_EMBED), use_container_width=True)
 
         col_emb1, col_emb2, col_emb3 = st.columns(3)
+        # Usar dim do config YAML do Production (32) — não do YAML base (que pode ter sido atualizado)
+        prod_emb_dim = prod_hp.get("architecture", {}).get("embedding_dim", 32) if prod_hp else 32
+        prod_cat_dim = prod_hp.get("architecture", {}).get("category_embedding_dim", 8) if prod_hp else 8
         col_emb1.metric(
             "User Embeddings",
             f"{ncf_config['n_users']:,}",
-            help="Dimensão 16 — 93.358 usuários",
+            help=f"Dimensão {prod_emb_dim} — {ncf_config['n_users']:,} usuários",
         )
         col_emb2.metric(
             "Item Embeddings",
             f"{ncf_config['n_items']:,}",
-            help="Dimensão 16 — 32.216 produtos",
+            help=f"Dimensão {prod_emb_dim} — {ncf_config['n_items']:,} produtos",
         )
         col_emb3.metric(
             "Category Embeddings",
             f"{ncf_config['n_categories']:,}",
-            help="Dimensão 8 — 72 categorias",
+            help=f"Dimensão {prod_cat_dim} — {ncf_config['n_categories']:,} categorias",
         )
 
         st.markdown("---")
 
         # --- Bloco 6: Hiperparâmetros ---
-        st.subheader("⚙️ Hiperparâmetros do Modelo FINAL (Etapa 4)")
+        st.subheader("⚙️ Hiperparâmetros do Modelo Production (configs/ncf_best.yaml)")
+
+        arch = prod_hp.get("architecture", {}) if prod_hp else {}
+        train_cfg = prod_hp.get("training", {}) if prod_hp else {}
 
         ncf_hp = {
-            "Embedding dim (user/item)": "32",
-            "Embedding dim (category)": "8",
-            "MLP hidden layers": "[64, 32]",
-            "Dropout": "0.5",
-            "Learning rate": "5e-4",
-            "Optimizer": "AdamW",
-            "Weight decay": "5e-4",
-            "Batch size": "2048",
-            "N negatives (treino)": "8",
-            "Loss function": "BPR",
-            "Epochs (com early stop)": "14",
-            "Patience": "3",
-            "Gradient clipping": "5.0",
-            "Scheduler": "ReduceLROnPlateau(factor=0.5, patience=2)",
-            "Scaler": "N/A (ablation — sem features auxiliares)",
+            "Embedding dim (user/item)": str(arch.get("embedding_dim", "32")),
+            "Embedding dim (category)": str(arch.get("category_embedding_dim", "8")),
+            "MLP hidden layers": str(arch.get("hidden_layers", [64, 32])),
+            "Dropout": str(arch.get("dropout", 0.5)),
+            "Optimizer": str(train_cfg.get("optimizer", "adamw")),
+            "Learning rate": str(train_cfg.get("learning_rate", 5e-4)),
+            "Weight decay": str(train_cfg.get("weight_decay", 5e-4)),
+            "Batch size": str(train_cfg.get("batch_size", 2048)),
+            "N negatives (treino)": str(train_cfg.get("negative_samples_per_positive", 8)),
+            "Loss function": str(train_cfg.get("loss", "BPR")),
+            "Epochs (max com early stop)": str(train_cfg.get("epochs_max", 20)),
+            "Patience": str(train_cfg.get("early_stopping_patience", 3)),
+            "Gradient clipping": str(train_cfg.get("gradient_clipping_max_norm", 5.0)),
+            "Scheduler": f"{train_cfg.get('scheduler', 'ReduceLROnPlateau')}(factor={train_cfg.get('scheduler_factor', 0.5)}, patience={train_cfg.get('scheduler_patience', 2)})",
+            "Side features (ablation)": "❌ DESABILITADO (modelo `no_aux`)",
+            "Scaler": "N/A (sem features auxiliares)",
             "Negative sampling": "on-the-fly",
-            "Side features": "❌ DESABILITADO (ablation)",
+            "MLflow experiment": str(prod_hp.get("artifacts", {}).get("mlflow_experiment", "Olist_NCF_Ablation")),
+            "MLflow run": str(prod_hp.get("artifacts", {}).get("mlflow_best_run_name", "Ablation_FINAL_no_aux_emb32")),
         }
 
         hp_cols = st.columns(2)
@@ -929,12 +1008,14 @@ if _ncf_available:
         st.markdown("---")
         st.subheader("🔧 Como Reproduzir")
         st.code(
-            "# Treinar nova run do NCF\n"
-            "uv run python scripts/train_ncf.py \\\n"
-            "    --epochs 12 --emb-dim 16 --hidden 64 32 \\\n"
-            "    --batch-size 1024 --lr 5e-4 --n-negatives 4 \\\n"
-            "    --experiment-name 'Olist_NCF_Baseline'\n\n"
-            "# Visualizar experimentos no MLflow UI\n"
+            "# Treinar nova run do NCF (Production)\n"
+            "uv run python src/train.py \\\n"
+            "    --epochs 20 --emb-dim 32 --hidden 64 32 \\\n"
+            "    --batch-size 2048 --lr 5e-4 --n-negatives 8 \\\n"
+            "    --dropout 0.5 --no-aux\n\n"
+            "# Gerar figuras do relatorio\n"
+            "uv run python scripts/generate_ncf_figures.py\n\n"
+            "# Visualizar experimentos no MLflow UI (SQLite local)\n"
             "uv run mlflow ui \\\n"
             "    --backend-store-uri sqlite:///./artifacts/mlflow.db",
             language="bash",
@@ -947,16 +1028,24 @@ if _ncf_available:
 baseline_tab_idx = 3 if len(tabs) > 4 else None
 if baseline_tab_idx is not None:
     with tabs[baseline_tab_idx]:
-        st.header("🎯 Top Recomendações Geradas pelos Baselines")
+        st.header("🎯 Recomendações Geradas pelos Baselines")
 
         if df_baseline is None or df_baseline.empty:
             st.warning(
-                "⚠️ Artefato `temporary_baseline_recommendations.csv` não encontrado. "
-                "Execute `uv run python src/train.py` para gerar as recomendações dos baselines."
+                "⚠️ Artefatos de recomendacoes nao encontrados em `artifacts/baselines/`. "
+                "Execute `uv run python src/train.py` para gerar as recomendacoes dos baselines."
             )
         else:
             # Carrega nome das categorias para enriquecer a tabela
-            category_map = {}
+            category_map: dict = {}
+            product_id_map: dict = {}
+            if df_fe is not None and "product_id_idx" in df_fe.columns:
+                # product_id_idx -> category_id (ja encoded)
+                cat_lookup = (
+                    df_fe.drop_duplicates("product_id_idx")
+                    .set_index("product_id_idx")[["category_id", "product_id"]]
+                )
+                product_id_map = cat_lookup["product_id"].to_dict()
             if df is not None and "product_id" in df.columns and "product_category_name_english" in df.columns:
                 category_map = (
                     df.drop_duplicates("product_id")
@@ -965,41 +1054,43 @@ if baseline_tab_idx is not None:
                 )
 
             col1, col2, col3 = st.columns(3)
-            col1.metric("Linhas de Recomendação", f"{len(df_baseline)}")
-            col2.metric("Modelos Gerados", f"{df_baseline.shape[1] // 2}")
-            col3.metric("Top-N", "10")
+            col1.metric("Arquivos de Recomendacao", f"{len(df_baseline['baseline_model'].unique())} baselines")
+            col2.metric("Top-N medio", f"{int(df_baseline['k'].mean())}")
+            col3.metric("Variantes geradas", f"{df_baseline.groupby(['baseline_model', 'k']).ngroups}")
 
             st.markdown("---")
-            st.subheader("📋 Tabela de Recomendações Enriquecidas")
+            st.subheader("📋 Inventario de Artefatos em `artifacts/baselines/`")
 
-            # Enriquecer com categorias se possível
-            display_df = df_baseline.copy()
-            for col_prefix in ["Popularity", "TopRated"]:
-                cat_col = f"{col_prefix}_Category"
-                id_col = f"{col_prefix}_ID"
-                if id_col in display_df.columns and category_map:
-                    display_df[cat_col] = display_df[id_col].map(category_map).fillna("unknown")
+            inventory = (
+                df_baseline.groupby(["baseline_model", "variant", "k"])
+                .size()
+                .reset_index(name="linhas")
+            )
+            st.dataframe(inventory, use_container_width=True, hide_index=True)
 
-            st.dataframe(display_df.head(20), use_container_width=True)
-
-            # Distribuição de categorias recomendadas
-            if "Popularity_Category" in display_df.columns:
-                st.subheader("📊 Categorias Recomendadas (Baseline Popularidade)")
-                cat_counts = display_df["Popularity_Category"].value_counts().head(15)
-                fig = px.bar(
-                    x=cat_counts.values,
-                    y=cat_counts.index,
-                    orientation="h",
-                    labels={"x": "Frequência", "y": "Categoria"},
-                    title="Concentração das Recomendações",
-                    color_discrete_sequence=["#58a6ff"],
-                )
-                fig.update_layout(height=500, **plotly_template())
-                st.plotly_chart(fig, use_container_width=True)
+            # Para um baseline especifico, mostrar top-K como exemplo
+            st.markdown("---")
+            st.subheader("🔍 Exemplo: Top-5 Recomendacoes (Popularidade K=10)")
+            pop_k10 = df_baseline[(df_baseline["baseline_model"] == "PopularityBaseline") & (df_baseline["k"] == 10)]
+            if not pop_k10.empty:
+                # Pegar primeiros 5 usuarios
+                sample = pop_k10.head(5).copy()
+                # rank_<r> contem product_id (UUID string), mapear para categoria
+                display_rows = []
+                for _, row in sample.iterrows():
+                    recs = []
+                    for r in range(1, 6):
+                        pid = row.get(f"rank_{r}")
+                        if pd.isna(pid):
+                            continue
+                        cat = category_map.get(pid, "?")
+                        recs.append(f"#{r}: {str(pid)[:12]}… ({cat})")
+                    display_rows.append({"user_idx": row["rank0_user"], "Top-5": " | ".join(recs)})
+                st.dataframe(pd.DataFrame(display_rows), use_container_width=True, hide_index=True)
 
 
 # ============================================================================
-# ABA 4 — SOBRE O PIPELINE
+# ABA FINAL — SOBRE O PIPELINE
 # ============================================================================
 with tabs[-1]:
     st.header("ℹ️ Sobre o Pipeline de Dados")
@@ -1017,32 +1108,46 @@ with tabs[-1]:
         prepare (src/data_preparation.py)
           ↓ interactions.parquet (10 colunas, ~100k interações)
         featurize (src/feature_engineering.py)
-          ↓ interactions_fe.parquet (42 colunas)
-        validate (shape == (99785, 42))
-          ↓
+          ↓ interactions_fe.parquet (42 colunas, 18 features numericas)
+        audit (scripts/feature_selection.py)
+          ↓ Spearman |rho| > 0.95 → remove 2 features redundantes
+        ↓
         train (src/train.py)
-          ↓ Baseline popularity + top-rated + item-item CF
-          ↓ MLflow tracking
+          ↓ 4 baselines (Popularity, TopRated, ItemItemCF, TruncatedSVD)
+          ↓ NCF Production (Ablation_FINAL_no_aux_emb32)
+          ↓ MLflow tracking (SQLite local)
         ```
 
         ### 🧪 Decisões Arquiteturais
-        - **Cold-start desabilitado**: filtro reduziria o dataset de 99.785 para 2.656 linhas.
+        - **Split temporal** (70/15/15) obrigatório para evitar data leakage.
         - **Target encoding** para categorias com Bayesian smoothing (alpha=10).
-        - **Split temporal** (não aleatório) para evitar data leakage.
-        - **Embeddings** para `user_id`, `product_id_idx`, `category_id`.
+        - **BPR Loss** com negative sampling on-the-fly para feedback implícito.
+        - **Ablation**: features auxiliares **prejudicam** o modelo com 98% cold-start.
+        - **Factory Method** em `src/models/factory.py` para construir modelos.
+        - **Strategy Pattern** em `src/data/strategies.py` para pré-processamento.
+        - **Sparsity extrema**: 99,9967% — semi-cold-start (98% dos test users inéditos).
 
         ### 📊 Métricas Avaliadas
-        - NDCG@K (principal)
-        - Recall@K
+        - NDCG@K (principal para ranking)
         - MAP@K
-        - Hit Rate@K
+        - Recall@K
+        - HitRate@K
+        - Precision@K
 
         ### 🔧 Como Reproduzir
         ```bash
-        uv run python src/data_preparation.py
-        uv run python src/feature_engineering.py
-        uv run python src/train.py
-        mlflow ui --host 127.0.0.1 --port 5000
+        # Pipeline completo (DVC)
+        uv run dvc repro
+
+        # Treinar modelos
+        uv run python src/train.py --baselines
+        uv run python src/train.py --ncf --epochs 20 --emb-dim 32
+
+        # MLflow UI local
+        uv run mlflow ui --backend-store-uri sqlite:///./artifacts/mlflow.db
+
+        # Dashboard
+        uv run streamlit run front/app_vis.py
         ```
         """
     )
