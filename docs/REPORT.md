@@ -478,12 +478,31 @@ Embora a remoção das 2 features tenha **piorado** o NDCG do modelo com aux fea
 | Registrar um patamar mínimo de 3 execuções com MLflow | ⚠️ Framework configurado, servidor requerido |
 | Estabelecer quantitativamente 3 módulos rastreados do DVC | ✅ Concluído (prepare, featurize, validate) |
 | Produzir base do modelo implementado através de redes em PyTorch | ✅ Concluído (NCF Hybrid + BPR Loss) |
-| Gerar pontos comparativos com o Scikit-Learn | ✅ Concluído (Popularity, TopRated, ItemItemCF) |
+| Gerar pontos comparativos com o Scikit-Learn | ✅ Concluído (Popularity, TopRated, ItemItemCF, TruncatedSVD) |
 | Split temporal para avaliação | ✅ Concluído (70/15/15) |
-| 6 runs MLflow registradas (≥ 3 mínimo) | ✅ Concluído (3 experimentos: Baseline, Optimization, Ablation) |
-| Modelo registrado no MLflow Model Registry | ✅ Concluído (olist_ncf_recommender v1 → Production) |
+| 11+ runs MLflow registradas (≥ 3 mínimo) | ✅ Concluído (4 baselines + 1 Otimização + 2 Ablation + 1 Auditoria Spearman) |
+| Modelo registrado no MLflow Model Registry | ✅ Concluído (olist_ncf_recommender v1 → Production, NDCG@K=0.2725) |
 | Disponibilizar infraestrutura serverless/endpoint em Cloud pública | ⏳ Pendente |
 | Organizar elaboração teórica com Model Card e Pitches do tipo STAR | ⏳ Pendente |
+
+### 9.1 Entendendo a Métrica Principal (NDCG@10)
+
+O **NDCG@10** (*Normalized Discounted Cumulative Gain at 10*) é a métrica padrão-ouro na indústria para motores de busca e sistemas de recomendação. Em e-commerce como o Olist, não basta apenas sugerir produtos relevantes — **a ordem importa**. O usuário precisa ver os itens que mais deseja logo nas primeiras posições da vitrine.
+
+O NDCG traduz esse comportamento para a matemática através de 5 pilares:
+
+- **Gain (Ganho):** O modelo pontua apenas se recomendar um produto que o usuário considera relevante (ex: um item que ele compraria).
+- **Cumulative (Cumulativo):** A pontuação é a soma de todos os acertos dentro da lista recomendada.
+- **Discounted (Desconto/Penalidade):** É o coração da métrica. O modelo sofre uma redução drástica de pontos se colocar um item relevante nas últimas posições. Um acerto na posição 1 vale muito mais do que um acerto na posição 10.
+- **Normalized (Normalizado):** Como alguns usuários interagem com muitos produtos e outros com poucos, a pontuação é dividida pelo cenário "perfeito" (Ideal DCG), garantindo a escala **0 a 1**.
+- **@10 (Corte):** Avaliamos apenas o Top 10. Na vida real, o cliente raramente rola a página para ver dezenas de itens. Se o produto certo estiver na 11ª posição, o modelo é penalizado.
+
+**Referência de performance:**
+- **Baselines clássicos** (Popularity, TopRated, ItemItemCF): NDCG@10 ≈ 0.005 (piso — sem personalização)
+- **Modelo Production (Ablation_FINAL_no_aux_emb32):** NDCG@10 = **0.2725** (60× vs baseline)
+- **Lift do NCF:** `60×` em relação à popularidade global — personalização comprovada
+
+Para a explicação matemática detalhada (fórmulas e implementação), consulte [`docs/GUIDE.md` §9](docs/GUIDE.md).
 
 ---
 

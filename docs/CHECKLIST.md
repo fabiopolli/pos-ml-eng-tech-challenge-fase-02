@@ -1,6 +1,6 @@
 # CHECKLIST — Tech Challenge Fase 02: Sistema de Recomendação
 
-> Checklist de execução derivado do PDF `Tech_Challenge_Fase_02.pdf` e da `propostaV1.md`.
+> Checklist de execução derivado do PDF `Tech_Challenge_Fase_02.pdf`.
 > Convenção de status: `[x]` feito · `[~]` em andamento / parcial · `[ ]` pendente.
 
 ---
@@ -8,8 +8,7 @@
 ## Visão Geral do Desafio
 
 - [x] Ler e interpretar `Tech_Challenge_Fase_02.pdf`
-- [x] Ler e interpretar `docs/propostaV1.md`
-- [x] Validar alinhamento da proposta com o grupo (4 etapas do PDF vs. 5 fases da proposta)
+- [x] Validar alinhamento da proposta com o grupo (4 etapas do PDF)
 
 ### Requisitos transversais (valem em todas as etapas)
 
@@ -26,7 +25,7 @@
 ## ETAPA 0 — Pipeline de ML (fundação executada em `notebooks/` + `src/`)
 
 > Não está totalmente detalhada no PDF, mas é pré-requisito para a ETAPA 4.
-> Documentos de referência: `docs/REPORT.md` (progresso macro), `docs/GUIDE.md` (guia técnico de modelagem), `docs/ML_EXECUTION_GUIDE.md` (passos de execução).
+> Documentos de referência: `docs/REPORT.md` (progresso macro, timeline, métricas de sucesso), `docs/GUIDE.md` (guia técnico de modelagem, fórmulas de métricas), `README.md` (Quick Start para execução).
 > ⚠️ **Alerta resolvido**: Pipeline 2 (classificação `review_score`) foi removido. Apenas o Pipeline 1 (Recomendação) permanece.
 
 ### 0.1 Escolha do dataset
@@ -105,7 +104,7 @@
 
 ### 0.7 Treinamento do MLP (PyTorch) — **✅ CONCLUÍDO**
 
-> Especificação detalhada em `docs/GUIDE.md` §11 e `docs/NCF_IMPLEMENTATION_PLAN.md`.
+> Especificação detalhada em `docs/GUIDE.md` §11 (arquitetura NCF, BPR loss, hiperparâmetros).
 
 - [x] Definir arquitetura NCF (Neural Collaborative Filtering):
   - [x] `nn.Embedding` para `user_id` e `product_id_idx` (emb_dim=32)

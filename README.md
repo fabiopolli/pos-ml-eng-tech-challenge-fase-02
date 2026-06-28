@@ -113,7 +113,6 @@ pos-ml-eng-tech-challenge-fase-02/
 ├── docs/
 │   ├── GUIDE.md                  # Guia técnico de modelagem
 │   ├── REPORT.md                 # Relatório de progresso detalhado
-│   ├── NCF_IMPLEMENTATION_PLAN.md # Plano de implementação NCF
 │   ├── NAMING_CONVENTIONS.md     # Convenções de nomenclatura Python
 │   ├── SRP_RESPONSIBILITIES.md   # SRP por módulo (responsabilidades)
 │   ├── CHECKLIST.md              # Checklist de entregas
@@ -273,9 +272,8 @@ uv run mlflow ui --backend-store-uri sqlite:///./artifacts/mlflow.db
 
 | Arquivo | Descrição |
 |---------|-----------|
-| [`docs/GUIDE.md`](docs/GUIDE.md) | Guia técnico de modelagem (NCF, split temporal, negative sampling) |
-| [`docs/ML_EXECUTION_GUIDE.md`](docs/ML_EXECUTION_GUIDE.md) | Passo-a-passo para executar o pipeline |
-| [`docs/REPORT.md`](docs/REPORT.md) | Relatório detalhado de progresso |
+| [`docs/GUIDE.md`](docs/GUIDE.md) | Guia técnico de modelagem (NCF, split temporal, negative sampling, fórmulas de métricas) |
+| [`docs/REPORT.md`](docs/REPORT.md) | Relatório detalhado de progresso, timeline, métricas de sucesso |
 | [`docs/NAMING_CONVENTIONS.md`](docs/NAMING_CONVENTIONS.md) | Convenções de nomenclatura Python (snake_case, PascalCase, prefixos) |
 | [`docs/SRP_RESPONSIBILITIES.md`](docs/SRP_RESPONSIBILITIES.md) | SRP por módulo (responsabilidades únicas, anti-patterns) |
 | [`reports/feature_audit_spearman.md`](reports/feature_audit_spearman.md) | Auditoria de features redundantes via correlação de Spearman |
