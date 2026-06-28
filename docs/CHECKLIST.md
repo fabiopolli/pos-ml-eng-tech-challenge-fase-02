@@ -1,6 +1,6 @@
 # CHECKLIST — Tech Challenge Fase 02: Sistema de Recomendação
 
-> Checklist de execução derivado do PDF `Tech_Challenge_Fase_02.pdf`.
+> Checklist de execução derivado do PDF `Tech_Challenge_Fase_02.pdf` e da `propostaV1.md`.
 > Convenção de status: `[x]` feito · `[~]` em andamento / parcial · `[ ]` pendente.
 
 ---
@@ -8,7 +8,8 @@
 ## Visão Geral do Desafio
 
 - [x] Ler e interpretar `Tech_Challenge_Fase_02.pdf`
-- [x] Validar alinhamento da proposta com o grupo (4 etapas do PDF)
+- [x] Ler e interpretar `docs/propostaV1.md`
+- [x] Validar alinhamento da proposta com o grupo (4 etapas do PDF vs. 5 fases da proposta)
 
 ### Requisitos transversais (valem em todas as etapas)
 
@@ -329,7 +330,7 @@
 | Rede neural (PyTorch)            | 15%  |  [x]   |
 | MLflow + Registry                | 10%  |  [x]   |
 | Vídeo STAR                       | 10%  |  [ ]   |
-| **Bônus:** Deploy em nuvem       |  5%  |  [ ]   |
+| Deploy em nuvem                  |  5%  |  [ ]   |
 
 > Legenda: `[x]` feito · `[~]` parcial · `[ ]` pendente.
 > **Nota 2026-06-27:** "Clean code e estrutura" promovido para `[x]` — ruff zero warnings, Factory + Strategy implementados, Pydantic Settings em uso. "DVC + Pipeline" rebaixado para `[~]` — itens pendentes: configurar DVC remote e validar 3+ stages em `dvc.yaml`.
