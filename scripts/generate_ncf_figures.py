@@ -1,22 +1,22 @@
 """Gera as figuras do notebook para uso no dashboard Streamlit."""
-import json
 import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import torch
-import yaml
 
 PROJECT_ROOT = Path('.').resolve()
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.data.splits import temporal_split
-from src.data.preprocessing import fit_scaler, transform_features
-from src.data.dataset import build_user_items_map
-from src.models.ncf import NCFHybrid
-from src.training.evaluate import evaluate_model, calculate_metrics_at_k
+import torch  # noqa: E402
+import yaml  # noqa: E402
+
+from src.data.dataset import build_user_items_map  # noqa: E402
+from src.data.preprocessing import fit_scaler, transform_features  # noqa: E402
+from src.data.splits import temporal_split  # noqa: E402
+from src.models.ncf import NCFHybrid  # noqa: E402
+from src.training.evaluate import calculate_metrics_at_k, evaluate_model  # noqa: E402
 
 plt.style.use('seaborn-v0_8-whitegrid')
 
@@ -66,7 +66,7 @@ ncf_val = evaluate_model(model, val_df, val_aux, user_items_map, all_item_ids, k
 
 # Baseline de popularidade
 popular_items = train_df['product_id_idx'].value_counts().head(10).index.to_numpy()
-baseline_test = {m: 0.0 for m in ['HitRate@K', 'Recall@K', 'Precision@K', 'NDCG@K', 'MAP@K']}
+baseline_test = dict.fromkeys(['HitRate@K', 'Recall@K', 'Precision@K', 'NDCG@K', 'MAP@K'], 0.0)
 n_eval = 0
 for uid in test_df['user_id'].unique():
     true_items = set(test_df[test_df['user_id'] == uid]['product_id_idx'].tolist())
@@ -105,7 +105,7 @@ ax.set_title('NCF vs Baseline: Quantas vezes melhor?')
 ax.axhline(y=1, color='gray', linestyle='--', alpha=0.5, label='Baseline = 1.0')
 ax.legend()
 ax.grid(axis='y', alpha=0.3)
-for bar, lift in zip(bars, lifts):
+for bar, lift in zip(bars, lifts, strict=False):
     ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 1,
             f'{lift:.1f}x', ha='center', fontsize=10, fontweight='bold')
 

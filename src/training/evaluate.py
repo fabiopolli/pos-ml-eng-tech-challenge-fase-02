@@ -1,33 +1,32 @@
 """Métricas de avaliação @K para sistemas de recomendação."""
 from __future__ import annotations
 
-from typing import Dict, Set
-
 import numpy as np
 import pandas as pd
 import torch
 
+from src.config import settings
 
 # Aux columns (mesmas do config)
 _AUX_COLS = [
-    "price_log", "freight_value_log", "price_to_freight_ratio", "has_price_outlier",
+    "price_log", "price_to_freight_ratio", "has_price_outlier",
     "days_since_reference", "is_weekend", "is_holiday_season",
     "category_target_enc", "category_frequency",
     "payment_type_credit_card", "payment_type_boleto",
     "payment_type_voucher", "payment_type_debit_card",
     "user_total_purchases", "user_avg_freight",
-    "user_purchase_span_days", "user_recency_days",
+    "user_purchase_span_days",
     "product_popularity", "product_avg_review_score", "product_review_rate",
 ]
 
 
-def _build_item_lookup(df: pd.DataFrame, aux_cols: list[str]) -> Dict[int, np.ndarray]:
+def _build_item_lookup(df: pd.DataFrame, aux_cols: list[str]) -> dict[int, np.ndarray]:
     """Lookup por product_id_idx -> (categoria, vetor aux).
 
     Para itens com múltiplas linhas, pega a primeira ocorrência.
     """
-    lookup: Dict[int, np.ndarray] = {}
-    cat_lookup: Dict[int, int] = {}
+    lookup: dict[int, np.ndarray] = {}
+    cat_lookup: dict[int, int] = {}
     df_unique = df.drop_duplicates(subset=["product_id_idx"], keep="first")
     for _, row in df_unique.iterrows():
         item_id = int(row["product_id_idx"])
@@ -39,18 +38,19 @@ def _build_item_lookup(df: pd.DataFrame, aux_cols: list[str]) -> Dict[int, np.nd
 def calculate_metrics_at_k(
     recommended_list: np.ndarray,
     true_items_set: set,
-    k: int = 10,
-) -> Dict[str, float]:
+    k: int | None = None,
+) -> dict[str, float]:
     """Calcula métricas de ranking @K para um único usuário.
 
     Args:
         recommended_list: Array ordenado de IDs de itens recomendados.
         true_items_set: Set de IDs de itens realmente relevantes.
-        k: Cutoff K.
+        k: Cutoff K (default: settings.k_eval = 10).
 
     Returns:
         Dict com HitRate@K, Recall@K, Precision@K, NDCG@K, MAP@K.
     """
+    k = k if k is not None else settings.k_eval
     rec_k = recommended_list[:k]
     hits = np.array([1 if item in true_items_set else 0 for item in rec_k])
     num_hits = int(hits.sum())
@@ -86,17 +86,94 @@ def calculate_metrics_at_k(
     }
 
 
+def _build_item_lookups(eval_df: pd.DataFrame) -> tuple[dict[int, int], dict[int, int]]:
+    """Constrói lookups item_id -> (row_idx, category_id)."""
+    item_to_row_idx: dict[int, int] = {}
+    item_to_cat: dict[int, int] = {}
+    for i, row in eval_df.reset_index(drop=True).iterrows():
+        item_id = int(row["product_id_idx"])
+        if item_id not in item_to_row_idx:
+            item_to_row_idx[item_id] = i
+            item_to_cat[item_id] = int(row["category_id"])
+    return item_to_row_idx, item_to_cat
+
+
+def _filter_cold_start_users(
+    eval_users: np.ndarray, user_items_map: dict[int, set[int]]
+) -> list:
+    """Retorna apenas usuários com histórico; reporta contagem de cold-start."""
+    test_users_eval = [u for u in eval_users if int(u) in user_items_map and len(user_items_map[int(u)]) > 0]
+    n_cold = len(eval_users) - len(test_users_eval)
+    if n_cold > 0:
+        print(f"  [eval] {n_cold}/{len(eval_users)} usuários cold-start ignorados")
+    return test_users_eval
+
+
+def _sample_candidates_for_user(
+    uid: int,
+    true_items: set[int],
+    seen: set[int],
+    all_item_ids: np.ndarray,
+    n_neg_eval: int,
+    rng: np.random.Generator,
+) -> list[int]:
+    """Gera pool de candidatos: 1 positivo + n_neg_eval negativos não vistos."""
+    candidates: list[int] = []
+    for pos_item in true_items:
+        candidates.append(int(pos_item))
+        neg_count, attempts = 0, 0
+        while neg_count < n_neg_eval and attempts < n_neg_eval * 20:
+            neg = int(rng.choice(all_item_ids))
+            if neg not in seen and neg not in true_items:
+                candidates.append(neg)
+                neg_count += 1
+            attempts += 1
+    return candidates
+
+
+def _build_score_tensors(
+    candidates: list[int],
+    uid: int,
+    item_to_row_idx: dict[int, int],
+    item_to_cat: dict[int, int],
+    eval_aux_normalized: np.ndarray,
+    n_features: int,
+    device: str,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Constrói os 4 tensores de input do modelo: user, item, category, aux."""
+    n_cand = len(candidates)
+    user_tensor = torch.full((n_cand,), int(uid), dtype=torch.long, device=device)
+    item_tensor = torch.tensor(candidates, dtype=torch.long, device=device)
+    cat_tensor = torch.tensor(
+        [item_to_cat.get(c, 0) for c in candidates], dtype=torch.long, device=device
+    )
+    aux_rows = [
+        eval_aux_normalized[item_to_row_idx[c]] if c in item_to_row_idx
+        else np.zeros(n_features, dtype=np.float32)
+        for c in candidates
+    ]
+    aux_tensor = torch.tensor(np.stack(aux_rows), dtype=torch.float32, device=device)
+    return user_tensor, item_tensor, cat_tensor, aux_tensor
+
+
+def _aggregate_metrics(all_metrics: dict[str, list[float]]) -> dict[str, float]:
+    """Calcula média das métricas, retornando 0.0 se não houver dados."""
+    if not all_metrics["Recall@K"]:
+        return dict.fromkeys(all_metrics, 0.0)
+    return {m: float(np.mean(v)) for m, v in all_metrics.items() if v}
+
+
 def evaluate_model(
     model,
     eval_df: pd.DataFrame,
     eval_aux_normalized: np.ndarray,
-    user_items_map: Dict[int, Set[int]],
+    user_items_map: dict[int, set[int]],
     all_item_ids: np.ndarray,
     k: int = 10,
     n_neg_eval: int = 99,
     device: str = "cpu",
     filter_cold_start: bool = True,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """Avalia o modelo em pares (positivos do eval_df, n_neg_eval negativos aleatórios).
 
     IMPORTANTE: `eval_aux_normalized` deve estar na MESMA ORDEM de `eval_df`,
@@ -117,85 +194,40 @@ def evaluate_model(
         Dict com métricas médias.
     """
     model.eval()
-
-    # Lookups: (item_id -> idx em eval_df)
-    item_to_row_idx: Dict[int, int] = {}
-    item_to_cat: Dict[int, int] = {}
-    for i, row in eval_df.reset_index(drop=True).iterrows():
-        item_id = int(row["product_id_idx"])
-        if item_id not in item_to_row_idx:
-            item_to_row_idx[item_id] = i
-            item_to_cat[item_id] = int(row["category_id"])
-
+    item_to_row_idx, item_to_cat = _build_item_lookups(eval_df)
     n_features = eval_aux_normalized.shape[1]
     rng = np.random.default_rng(42)
 
-    all_metrics: Dict[str, list[float]] = {
-        "HitRate@K": [],
-        "Recall@K": [],
-        "Precision@K": [],
-        "NDCG@K": [],
-        "MAP@K": [],
+    all_metrics: dict[str, list[float]] = {
+        "HitRate@K": [], "Recall@K": [], "Precision@K": [],
+        "NDCG@K": [], "MAP@K": [],
     }
 
     eval_users = eval_df["user_id"].unique()
-    test_users_eval = []
-    if filter_cold_start:
-        for u in eval_users:
-            if int(u) in user_items_map and len(user_items_map[int(u)]) > 0:
-                test_users_eval.append(u)
-            else:
-                pass
-        n_cold_start = len(eval_users) - len(test_users_eval)
-        if n_cold_start > 0:
-            print(f"  [eval] {n_cold_start}/{len(eval_users)} usuários cold-start ignorados")
-    else:
-        test_users_eval = list(eval_users)
+    test_users_eval = (
+        _filter_cold_start_users(eval_users, user_items_map)
+        if filter_cold_start else list(eval_users)
+    )
 
     with torch.no_grad():
         for uid in test_users_eval:
             user_data = eval_df[eval_df["user_id"] == uid]
-            true_items = set(int(i) for i in user_data["product_id_idx"].tolist())
+            true_items = {int(i) for i in user_data["product_id_idx"].tolist()}
             if not true_items:
                 continue
 
             seen = user_items_map.get(int(uid), set())
-
-            # Candidatos: positivos + negativos
-            candidates: list[int] = []
-            for pos_item in true_items:
-                candidates.append(int(pos_item))
-                neg_count = 0
-                attempts = 0
-                while neg_count < n_neg_eval and attempts < n_neg_eval * 20:
-                    neg = int(rng.choice(all_item_ids))
-                    if neg not in seen and neg not in true_items:
-                        candidates.append(neg)
-                        neg_count += 1
-                    attempts += 1
-
+            candidates = _sample_candidates_for_user(
+                int(uid), true_items, seen, all_item_ids, n_neg_eval, rng
+            )
             if not candidates:
                 continue
 
-            # Tensores
-            n_cand = len(candidates)
-            user_tensor = torch.full((n_cand,), int(uid), dtype=torch.long, device=device)
-            item_tensor = torch.tensor(candidates, dtype=torch.long, device=device)
-
-            # Categorias
-            cats = [item_to_cat.get(c, 0) for c in candidates]
-            cat_tensor = torch.tensor(cats, dtype=torch.long, device=device)
-
-            # Aux features: usar do item real se conhecido, senão zeros
-            aux_rows = []
-            for c in candidates:
-                if c in item_to_row_idx:
-                    aux_rows.append(eval_aux_normalized[item_to_row_idx[c]])
-                else:
-                    aux_rows.append(np.zeros(n_features, dtype=np.float32))
-            aux_tensor = torch.tensor(np.stack(aux_rows), dtype=torch.float32, device=device)
-
-            scores = model(user_tensor, item_tensor, cat_tensor, aux_tensor).cpu().numpy()
+            user_t, item_t, cat_t, aux_t = _build_score_tensors(
+                candidates, int(uid), item_to_row_idx, item_to_cat,
+                eval_aux_normalized, n_features, device,
+            )
+            scores = model(user_t, item_t, cat_t, aux_t).cpu().numpy()
             top_k_idx = np.argsort(scores)[-k:][::-1]
             recommended = np.array([candidates[i] for i in top_k_idx])
 
@@ -203,7 +235,4 @@ def evaluate_model(
             for mname, val in metrics.items():
                 all_metrics[mname].append(val)
 
-    if not all_metrics["Recall@K"]:
-        return {m: 0.0 for m in all_metrics}
-
-    return {m: float(np.mean(v)) for m, v in all_metrics.items() if v}
+    return _aggregate_metrics(all_metrics)

@@ -1,0 +1,8 @@
+# Baseline Recommendations Output
+
+Este diretório armazena os artefatos gerados pelos modelos baseline (Popularity, Top-Rated, Item-Item CF, TruncatedSVD).
+
+**Convenção:**
+- Cada run produz um arquivo `recommendations_<ModelClass>_<run_name>.csv`
+- Estes arquivos são versionados fora de `data/processed/` para evitar poluição do DVC pipeline
+- Adicione ao `.gitignore` ou versione conforme política do projeto

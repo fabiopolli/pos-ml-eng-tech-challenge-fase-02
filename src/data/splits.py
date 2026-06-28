@@ -8,12 +8,14 @@ from typing import Tuple
 
 import pandas as pd
 
+from src.config import settings
+
 
 def temporal_split(
     df: pd.DataFrame,
-    time_col: str = "days_since_reference",
-    train_size: float = 0.70,
-    val_size: float = 0.15,
+    time_col: str = None,
+    train_size: float = None,
+    val_size: float = None,
     descending: bool = False,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Divide dataset em train/val/test baseado em ordenação temporal.
@@ -24,9 +26,9 @@ def temporal_split(
 
     Args:
         df: DataFrame com coluna temporal.
-        time_col: Nome da coluna proxy de tempo.
-        train_size: Proporção do treino (default 0.70).
-        val_size: Proporção da validação (default 0.15). Teste recebe o resto.
+        time_col: Nome da coluna proxy de tempo (default: settings.time_col).
+        train_size: Proporção do treino (default: settings.train_size = 0.70).
+        val_size: Proporção da validação (default: settings.val_size = 0.15).
         descending: Se True, ordena decrescente (mais recente primeiro).
 
     Returns:
@@ -35,6 +37,9 @@ def temporal_split(
     Raises:
         AssertionError: Se houver vazamento temporal.
     """
+    time_col = time_col or settings.time_col
+    train_size = train_size if train_size is not None else settings.train_size
+    val_size = val_size if val_size is not None else settings.val_size
     df_sorted = df.sort_values(by=time_col, ascending=not descending).reset_index(drop=True)
 
     n_total = len(df_sorted)

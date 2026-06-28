@@ -3,6 +3,9 @@ from __future__ import annotations
 
 import argparse
 import json
+
+# Imports do projeto
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -13,15 +16,17 @@ import torch
 import yaml
 from torch.utils.data import DataLoader
 
-# Imports do projeto
-import sys
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from src.config import settings as app_settings  # noqa: E402
 from src.data.dataset import ImplicitFeedbackDataset, build_user_items_map  # noqa: E402
-from src.data.preprocessing import fit_scaler, save_scaler_stats, transform_features  # noqa: E402
+from src.data.preprocessing import (  # noqa: E402
+    fit_scaler,
+    save_scaler_stats,
+    transform_features,
+)
 from src.data.splits import temporal_split  # noqa: E402
-from src.models.losses import bpr_loss  # noqa: E402
 from src.models.ncf import NCFHybrid  # noqa: E402
 from src.training.evaluate import calculate_metrics_at_k, evaluate_model  # noqa: E402
 
@@ -101,30 +106,30 @@ def main() -> None:
         type=Path,
         default=PROJECT_ROOT / "configs" / "selected_features.yaml",
     )
-    parser.add_argument("--epochs", type=int, default=20)
-    parser.add_argument("--batch-size", type=int, default=1024)
-    parser.add_argument("--lr", type=float, default=1e-3)
-    parser.add_argument("--emb-dim", type=int, default=16)
-    parser.add_argument("--hidden", type=int, nargs="+", default=[64, 32])
-    parser.add_argument("--dropout", type=float, default=0.3)
-    parser.add_argument("--n-negatives", type=int, default=1)
+    parser.add_argument("--epochs", type=int, default=app_settings.n_epochs)
+    parser.add_argument("--batch-size", type=int, default=app_settings.ncf_batch_size)
+    parser.add_argument("--lr", type=float, default=app_settings.ncf_lr)
+    parser.add_argument("--emb-dim", type=int, default=app_settings.ncf_emb_dim)
+    parser.add_argument("--hidden", type=int, nargs="+", default=app_settings.ncf_hidden)
+    parser.add_argument("--dropout", type=float, default=app_settings.ncf_dropout)
+    parser.add_argument("--n-negatives", type=int, default=app_settings.n_negatives)
     parser.add_argument("--patience", type=int, default=3)
-    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--seed", type=int, default=app_settings.seed)
     parser.add_argument(
         "--mlflow-uri",
         type=str,
-        default="sqlite:///./artifacts/mlflow.db",
+        default=app_settings.mlflow_uri,
         help="URI do MLflow tracking (SQLite)",
     )
     parser.add_argument(
         "--experiment-name",
         type=str,
-        default="Olist_NCF_Recommender",
+        default=app_settings.experiment_name,
     )
     parser.add_argument("--no-mlflow", action="store_true", help="Desabilita MLflow")
-    parser.add_argument("--device", type=str, default="auto")
+    parser.add_argument("--device", type=str, default=app_settings.device)
     parser.add_argument("--use-scheduler", action="store_true", help="Usar ReduceLROnPlateau")
-    parser.add_argument("--weight-decay", type=float, default=1e-5)
+    parser.add_argument("--weight-decay", type=float, default=app_settings.ncf_weight_decay)
     parser.add_argument("--run-name", type=str, default=None)
     parser.add_argument(
         "--ablation-no-aux",
@@ -228,7 +233,7 @@ def main() -> None:
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer, mode='max', factor=0.5, patience=2
         )
-        print(f"  Scheduler: ReduceLROnPlateau (factor=0.5, patience=2)")
+        print("  Scheduler: ReduceLROnPlateau (factor=0.5, patience=2)")
 
     n_params = sum(p.numel() for p in model.parameters())
     print(f"  Parâmetros: {n_params:,}")
@@ -247,7 +252,7 @@ def main() -> None:
         if not args.no_mlflow
         else _NullContext()
     )
-    with mlflow_ctx as run:
+    with mlflow_ctx:
         if not args.no_mlflow:
             import mlflow
             mlflow.log_params({
@@ -272,7 +277,7 @@ def main() -> None:
                     model, val_df, val_aux, user_items_map, all_item_ids,
                     k=10, n_neg_eval=99, device=device,
                 )
-                print(f"    val: " + " | ".join(
+                print("    val: " + " | ".join(
                     f"{k}={v:.4f}" for k, v in val_metrics.items()
                 ))
 

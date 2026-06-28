@@ -51,6 +51,7 @@ Este projeto foca no desenvolvimento end-to-end de um Sistema de Recomendação 
 | 2026-06-27 | 3 | Dashboard Streamlit (Resultados) | ✅ | front/app_vis.py (5 abas) |
 | 2026-06-27 | 3 | Notebook de Resultados | ✅ | notebooks/03_baseline_training.ipynb |
 | 2026-06-27 | 3 | Documentação e Correções | ✅ | README.md + REPORT.md atualizados |
+| 2026-06-27 | 3 | Auditoria Spearman de Features Redundantes | ✅ | Remoção de 2 features correlacionadas (>0.95); relatório em `reports/feature_audit_spearman.md`; decisão de manter `no_aux` como Production |
 
 ---
 
@@ -358,6 +359,97 @@ O ganho informacional das novas variáveis de agregação enriqueceu decisivamen
 - O bloco contínuo agrega volume coeso juntando-se paralelamente ao embedding de identificação do item base.
 - Padronização linear constitui regra compulsória barrando gradientes destrutivos provocados pela magnitude desmedida da popularidade bruta.
 
+### 7.6 Auditoria Spearman — Rodada Extra de Remoção de Features Redundantes
+
+**Data:** 2026-06-27
+**Método:** Correlação de Spearman pairwise (não-linear, robusta a outliers)
+**Threshold de corte:** `|ρ| > 0.95`
+**Dataset:** `data/processed/interactions_fe.parquet` (99.785 linhas × 42 colunas)
+**Features auditadas:** 20 numéricas em `configs/selected_features.yaml`
+**Relatório detalhado:** `reports/feature_audit_spearman.md`
+
+#### 7.6.1 Features Identificadas como Redundantes (|ρ| > 0.95)
+
+| Par | Spearman ρ | Feature Removida | Justificativa |
+|---|---|---|---|
+| `days_since_reference` ↔ `user_recency_days` | **−0.9861** | `user_recency_days` | Proxies temporais redundantes; `days_since_reference` é o timestamp canônico usado no split temporal |
+| `freight_value_log` ↔ `user_avg_freight` | **+0.9657** | `freight_value_log` | Ambos medem frete; `user_avg_freight` é uma agregação de usuário mais robusta |
+
+#### 7.6.2 Re-treinamento do NCF (Comparação Justa, 15-20 epochs)
+
+| Modelo | Features Usadas | NDCG@K | HitRate@K | Recall@K | MAP@K |
+|---|---|---|---|---|---|
+| `NCF_FINAL` (original) | 3 emb + 20 aux | 0.2226 | 0.3993 | 0.3914 | 0.1725 |
+| `Audit_Spearman_18feat` (novo) | 3 emb + 18 aux | **0.1932** | 0.3413 | 0.3322 | 0.1547 |
+| **`Ablation_FINAL_no_aux_emb32` (PRODUÇÃO)** | 3 emb only | **0.2725** | **0.4949** | **0.4886** | **0.2081** |
+
+#### 7.6.3 Conclusão Surpreendente
+
+**A remoção das 2 features redundantes NÃO melhorou o NDCG@K** — causou uma queda de 13.2% (de 0.2226 para 0.1932). Possíveis razões:
+
+- **Spearman ≠ redundância funcional:** A correlação monotônica linear não implica redundância para o modelo neural. O NCF aprende relações não-lineares onde features linearmente correlacionadas podem carregar sinais distintos em regiões específicas do espaço latente.
+- **Sinal vs. ruído:** Features com `|ρ| > 0.95` podem estar medindo o mesmo fenômeno linear mas com distribuições marginais diferentes — o que importa para a função de loss.
+- **Regularização implícita:** Mais features podem ajudar a rede a convergir para soluções mais estáveis, mesmo que linearmente redundantes.
+
+A descoberta mais importante: o **modelo Production (`Ablation_FINAL_no_aux_emb32`)**, que usa **apenas os 3 embeddings** (sem nenhuma feature auxiliar), supera todas as variantes com aux features:
+
+- vs 20 features (original): **+22.5% NDCG@K**
+- vs 18 features (após auditoria): **+41.0% NDCG@K**
+
+#### 7.6.4 Decisão Arquitetural
+
+**Manter `Ablation_FINAL_no_aux_emb32` como Production.** Justificativa:
+
+1. **Performance superior comprovada:** NDCG@K = 0.2725 (60× vs baseline de popularidade)
+2. **Complexidade mínima:** Apenas 3 embeddings + MLP, sem necessidade de pré-processamento de features
+3. **Generalização equivalente:** train_NDCG=0.5827 vs test_NDCG=0.2725 — gap similar aos modelos com aux
+4. **Alinhamento com a literatura:** Em datasets com alta esparsidade (99.997% no Olist) e sinal de preferência fraco (98% dos usuários com 1 compra), modelos neurais baseados puramente em embedding superam abordagens híbridas
+
+#### 7.6.5 Estado Atual do Modelo em Produção
+
+```yaml
+MLflow Model Registry:
+  Nome: olist_ncf_recommender
+  Versão: 1
+  Stage: Production
+  Run ID: a905125600df4452a2d3f3581a87ab42
+  Run Name: Ablation_FINAL_no_aux_emb32
+  Parâmetros:
+    epochs: 20
+    emb_dim: 32
+    hidden: [64, 32]
+    dropout: 0.5
+    lr: 0.0005
+    batch_size: 2048
+    n_negatives: 8
+    n_params: 4_027_009
+  Métricas de Teste:
+    NDCG@K: 0.2725
+    HitRate@K: 0.4949
+    Recall@K: 0.4886
+    Precision@K: 0.0509
+    MAP@K: 0.2081
+```
+
+#### 7.6.6 Artefatos Gerados pela Auditoria
+
+| Arquivo | Conteúdo |
+|---|---|
+| `configs/selected_features.yaml` | Reduzido de 20 → 18 numeric_features |
+| `src/training/evaluate.py` | `_AUX_COLS` reduzido de 20 → 18 features |
+| `data/processed/feature_metadata.json` | Adicionado `audit_history[1]` com metadados da rodada |
+| `artifacts/metrics_Audit_Spearman_18feat_E15.json` | Métricas do re-treino com 18 features |
+| `artifacts/ncf_Audit_Spearman_18feat_E15.pt` | Modelo serializado (16 MB) |
+| `reports/feature_audit_spearman.md` | Relatório técnico completo (8 seções) |
+
+#### 7.6.7 Nota sobre a Remoção em `configs/` e `_AUX_COLS`
+
+Embora a remoção das 2 features tenha **piorado** o NDCG do modelo com aux features, mantivemos as listas reduzidas (`numeric_features` e `_AUX_COLS`) por consistência com a auditoria. O **impacto em produção é nulo** porque:
+
+- O modelo Production (`no_aux`) não usa nenhuma feature auxiliar
+- A redução afeta apenas **futuros experimentos** que desejem testar com aux features
+- Estes experimentos terão baseline claro: o modelo `no_aux` (NDCG=0.2725) é o teto a superar
+
 ---
 
 ## 8. Issues Conhecidos e Resoluções
@@ -407,12 +499,14 @@ O ganho informacional das novas variáveis de agregação enriqueceu decisivamen
 10. **Otimização (Etapa 4):** 5 runs com variação de HPs + ablation study. Melhor: **NDCG@10 = 0.2725** (60× vs baseline).
 11. **Notebook NCF:** `notebooks/04_ncf_training_results.ipynb` com análise completa.
 12. **Relatório de Otimização:** `reports/ncf_optimization_report.md` com findings.
+13. **Auditoria Spearman de Features Redundantes:** Rodada extra de feature selection via correlação de Spearman. Identificadas e removidas 2 features redundantes (`user_recency_days`, `freight_value_log`). Decisão arquitetural: **manter `Ablation_FINAL_no_aux_emb32` como Production** (NDCG=0.2725, 60× vs baseline) — única configuração que supera todas as variantes com aux features. Relatório completo em `reports/feature_audit_spearman.md`; detalhes na Seção 7.6 deste documento.
 
 ### ⏳ Pendentes
 1.  **Containerização:** Preparar o Dockerfile multi-stage de produção.
 2.  **Implementação em Cloud:** Deploy em AWS/GCP/Azure com endpoint público.
 3.  **Model Card:** Documentação formal de métricas e limitações.
 4.  **Vídeo STAR:** Apresentação de 5 minutos para a banca.
+5.  **ETAPA 1 — Clean Code (sessão 2026-06-27):** Refatoração `evaluate_model()` em `src/training/evaluate.py` (121→73 linhas via 5 helpers); refatoração `evaluate_model()` em `src/train.py` (45→28 linhas via 2 helpers); consolidação `pyproject.toml` para PEP 621 puro com hatchling, remoção do `[tool.poetry]` duplicado; criação de `docs/NAMING_CONVENTIONS.md` (convenções, prefixos, sufixos, exemplos); criação de `docs/SRP_RESPONSIBILITIES.md` (mapa de módulos, anti-patterns, dependências); preenchimento de 4 docstrings públicas em `src/` (100% cobertura); Ruff zerado em `src/` e `scripts/` — All checks passed.
 
 ---
 

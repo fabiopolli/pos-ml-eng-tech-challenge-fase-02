@@ -142,6 +142,39 @@ uv run dvc dag       # Visualizar grafo do pipeline
 
 ---
 
+## ⏳ Por que Split Temporal (e não Aleatório)?
+
+O pipeline de recomendação adota **split temporal 70/15/15** (ordenado por `order_purchase_timestamp` → `days_since_reference`) em vez do split aleatório clássico de ML. Esta decisão é **deliberada** e fundamentada em três razões:
+
+### 1. Data leakage em split aleatório
+Split aleatório mistura passado e futuro nos conjuntos de treino e teste. Como em e-commerce há forte sinal temporal (sazonalidade, lançamentos, tendência de categorias), isso **superestima a performance real** do modelo. Um item comprado em 2018 não deveria estar no treino se foi comprado em 2017.
+
+### 2. Simulação realista do cenário de produção
+Em produção, o modelo é treinado com dados **até o momento atual** e recomenda pedidos **futuros**. O split temporal replica exatamente esse cenário:
+- **Treino:** 70% mais antigo (`days_since_reference` baixos)
+- **Validação:** 15% intermediário (early stopping, hyperparameter tuning)
+- **Teste:** 15% mais recente (métrica final, simulando produção)
+
+### 3. Sazonalidade e evolução de preferências
+- Categorias como **beleza/saúde** e **brinquedos** têm picos sazonais
+- Preferências de usuários mudam com o tempo (tendências, modas)
+- Novos produtos entram no catálogo após o treino — modelo deve ser avaliado sem conhecê-los
+
+### Implementação
+A função `temporal_split()` em [`src/data/splits.py`](src/data/splits.py) implementa a divisão com **assertions anti-leakage**:
+
+```python
+assert train_max <= val_min, "Vazamento: treino avança sobre validação"
+assert val_max <= test_min, "Vazamento: validação avança sobre teste"
+```
+
+As assertions falham imediatamente se a ordenação temporal for violada, garantindo que nenhum evento futuro contamine o treino.
+
+### Justificativa técnica completa
+Veja [`docs/GUIDE.md`](docs/GUIDE.md) §4 — "Split Temporal e Anti-Leakage" para análise técnica aprofundada (cálculo de leakage, comparação com split aleatório em toy dataset, e discussão de cold-start).
+
+---
+
 ## 🚀 Quick Start
 
 ```bash

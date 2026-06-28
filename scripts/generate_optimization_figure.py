@@ -77,7 +77,7 @@ ax.set_title('NCF vs Baseline Popularidade — NDCG@10', fontsize=12, fontweight
 ax.axhline(y=1, color='gray', linestyle='--', alpha=0.5)
 ax.grid(axis='y', alpha=0.3)
 
-for bar, lift in zip(bars, ndcg_lifts):
+for bar, lift in zip(bars, ndcg_lifts, strict=False):
     ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 1,
             f'{lift:.1f}x', ha='center', fontsize=10, fontweight='bold')
 

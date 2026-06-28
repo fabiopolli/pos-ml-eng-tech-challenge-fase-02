@@ -10,7 +10,6 @@ Executa:
 """
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import numpy as np
@@ -18,7 +17,6 @@ import pandas as pd
 import yaml
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.feature_selection import mutual_info_regression
-
 
 # Caminhos
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -103,22 +101,22 @@ def correlation_analysis(df: pd.DataFrame) -> dict:
 
 def mutual_information_scores(df: pd.DataFrame, target: str = "review_score") -> pd.Series:
     """Calcula MI score entre cada feature e o target."""
-    X = df[CANDIDATE_FEATURES].fillna(0).astype(np.float32)
+    x = df[CANDIDATE_FEATURES].fillna(0).astype(np.float32)
     y = df[target].fillna(df[target].median()).astype(np.float32)
 
-    mi = mutual_info_regression(X, y, random_state=42, n_jobs=-1)
+    mi = mutual_info_regression(x, y, random_state=42, n_jobs=-1)
     return pd.Series(mi, index=CANDIDATE_FEATURES).sort_values(ascending=False)
 
 
 def random_forest_importance(df: pd.DataFrame, target: str = "review_score") -> pd.Series:
     """Calcula importância via Random Forest."""
-    X = df[CANDIDATE_FEATURES].fillna(0).astype(np.float32)
+    x = df[CANDIDATE_FEATURES].fillna(0).astype(np.float32)
     y = df[target].fillna(df[target].median()).astype(np.float32)
 
     rf = RandomForestRegressor(
         n_estimators=100, max_depth=10, random_state=42, n_jobs=-1
     )
-    rf.fit(X, y)
+    rf.fit(x, y)
     return pd.Series(rf.feature_importances_, index=CANDIDATE_FEATURES).sort_values(ascending=False)
 
 

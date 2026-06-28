@@ -4,7 +4,6 @@ embedding_features:
 - category_id
 numeric_features:
 - price_log
-- freight_value_log
 - price_to_freight_ratio
 - has_price_outlier
 - days_since_reference
@@ -19,7 +18,6 @@ numeric_features:
 - user_total_purchases
 - user_avg_freight
 - user_purchase_span_days
-- user_recency_days
 - product_popularity
 - product_avg_review_score
 - product_review_rate

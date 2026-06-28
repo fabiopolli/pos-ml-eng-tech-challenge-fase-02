@@ -318,6 +318,18 @@ def save_metadata_readme(report: dict, metadata_path: Path) -> None:
 
 
 def main():
+    """Pipeline ETL para preparação dos dados do Olist.
+
+    Executa em sequência:
+    1. Carregamento dos CSVs brutos
+    2. Junção (merge) das tabelas Olist
+    3. Filtragem para pedidos `delivered`
+    4. Agregação em pares user x item
+    5. Salvamento de `interactions.parquet` + metadados
+
+    Returns:
+        None. Side effects: arquivos em `data/processed/`.
+    """
     logger.info("Starting Olist Data Preparation Pipeline...")
 
     try:

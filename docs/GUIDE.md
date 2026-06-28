@@ -454,6 +454,52 @@ print(f"Itens Similares ao Item {last_item_bought}: {recs_item_item}")
 
 Como os sistemas de recomendação retornam uma *lista ordenada* de sugestões, métricas tradicionais de classificação (Accuracy) não funcionam bem. Precisamos de métricas de ranking baseadas no top-K. Recomendo escrever essas funções do zero.
 
+### 9.0. Estratégia Formal de Avaliação Top-K
+
+Esta subseção define **oficialmente** como o sistema é avaliado, evitando ambiguidades na interpretação de resultados.
+
+#### Cutoffs (K)
+Avaliamos em **três níveis de cutoff** para analisar a sensibilidade do modelo:
+- **K = 5** (conservador) — útil para cenários de UI com pouco espaço (e.g., carousel principal)
+- **K = 10** (padrão da indústria) — referência para comparação com literatura (He et al. 2017, NCF)
+- **K = 20** (leniente) — útil para "ver mais" / infinite scroll
+
+#### Estratégia de candidatos (negative sampling na avaliação)
+Para cada usuário do conjunto de teste, geramos um pool de candidatos:
+- **1 item positivo** (verdadeiro ground-truth no teste)
+- **99 itens negativos** (amostrados aleatoriamente entre os itens NÃO consumidos pelo usuário no treino nem no teste)
+
+Total: **100 candidatos por usuário**. O modelo ranqueia estes 100 itens e avaliamos se o positivo aparece no Top-K.
+
+Esta estratégia:
+- Reduz custo computacional vs. avaliar sobre todo o catálogo (~32k itens)
+- É equivalente à estratégia **uniform negative sampler** em BPR loss
+- Reproduz cenário real onde apresentamos N itens ranqueados ao usuário
+
+#### Cold-start
+Usuários que **não aparecem no treino** são filtrados da avaliação:
+- Sem embeddings treinados, o modelo não consegue gerar ranking confiável
+- Excluí-los evita inflar artificialmente as métricas com zeros
+
+#### Agregação
+- **Média macro** sobre todos os usuários do teste: cada usuário tem o mesmo peso
+- (Alternativa seria média micro ponderada por nº de itens relevantes — não usamos)
+- Reportamos **média ± desvio padrão** quando há ≥ 30 usuários; apenas média caso contrário
+
+#### Métricas calculadas
+Cinco métricas oficiais:
+1. **HitRate@K** — cobertura: 1 se ≥1 hit, 0 caso contrário
+2. **Recall@K** — completude: quantos relevantes foram recuperados
+3. **Precision@K** — eficiência: quantos dos K são relevantes
+4. **NDCG@K** — qualidade posicional: desconto logarítmico
+5. **MAP@K** — média das precisões em cada posição de hit
+
+#### Protocolo de reporting
+Cada run no MLflow registra as 5 métricas em três Ks (5, 10, 20) → **15 valores por run**, mais:
+- `n_users_evaluated`: nº de usuários efetivamente usados na avaliação
+- `cold_start_rate`: % de usuários filtrados por cold-start
+- `eval_time_seconds`: tempo de inferência (para SLA de produção)
+
 ### 9.1. Fórmulas e Explicações
 - **Hit Rate@K:** 1 se pelo menos um item relevante estiver no top K, 0 caso contrário. (Mede a taxa de sucesso geral).
 - **Recall@K:** (Itens relevantes no Top K) / (Total de itens relevantes do usuário). Quantos dos itens desejados nós conseguimos encontrar.

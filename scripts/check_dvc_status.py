@@ -4,7 +4,6 @@ Quick Status Checker para o Pipeline DVC
 Verifica o status da execução do pipeline
 """
 
-import json
 from pathlib import Path
 
 

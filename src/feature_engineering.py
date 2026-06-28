@@ -518,6 +518,17 @@ def save_features(
 
 
 def main():
+    """Pipeline de Feature Engineering para o dataset Olist.
+
+    Executa em sequência:
+    1. Carregamento de `interactions.parquet`
+    2. Geração de features temporais, categóricas, agregações
+    3. Remoção de features constantes/colineares
+    4. Salvamento de `interactions_fe.parquet` + metadados
+
+    Returns:
+        None. Side effects: arquivos em `data/processed/`.
+    """
     if hasattr(logger, "add"):
         logger.add("feature_engineering.log", rotation="500 MB")
 
