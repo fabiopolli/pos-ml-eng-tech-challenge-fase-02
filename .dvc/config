@@ -1,4 +1,7 @@
 [core]
     no_scm = true
+    remote = origin
 ['remote "origin"']
-    url = https://dagshub.com/romagrinho/pos-ml-eng-tech-challenge-fase-02.dvc
+    url = https://dagshub.com/deniscelclaro/projeto_fiap_modulo2.dvc
+['remote "group_remote"']
+    url = gdrive://1mMcykBzLNdYPWavDNbf5o2UX9L5D0K6B
