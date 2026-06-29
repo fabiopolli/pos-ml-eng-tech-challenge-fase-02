@@ -13,8 +13,8 @@ stages:
       size: 15438671
     - path: data/olist_order_payments_dataset.csv
       hash: md5
-      md5: 75ce0c041d18e5f250c5cea9a8042944
-      size: 5777138
+      md5: d7aaceca670b76770e73286f99f3edfc
+      size: 5737249
     - path: data/olist_order_reviews_dataset.csv
       hash: md5
       md5: 914066be00d2db0c3d857f071cff1688
@@ -33,13 +33,13 @@ stages:
       size: 2613
     - path: src/data_preparation.py
       hash: md5
-      md5: e17a7bc7b8f2816f4be2e52908803733
-      size: 11372
+      md5: 9f7c66abb126db8ba32f6fdfbef9d080
+      size: 11742
     outs:
     - path: data/processed/README.md
       hash: md5
-      md5: c47a6ca1699284839badd9a4d499ce92
-      size: 312
+      md5: 2804c864e561562a98da83f122a29da4
+      size: 324
     - path: data/processed/interactions.parquet
       hash: md5
       md5: c0ebb24a636307b3da61df22c5fb7780
@@ -53,25 +53,25 @@ stages:
       size: 5970239
     - path: src/feature_engineering.py
       hash: md5
-      md5: 9b66855eb9710c7b2a96052f376dfad6
-      size: 18937
+      md5: a98cab10ce965598e44c33b28b08dae7
+      size: 19505
     outs:
     - path: data/processed/FEATURES.md
       hash: md5
-      md5: bdce7b0f9707d7a9ec73f0fdaf8ac29f
-      size: 2600
+      md5: d8ba34e077c4107e08265ac366fb2bda
+      size: 2656
     - path: data/processed/feature_metadata.json
       hash: md5
-      md5: 3b88050024861d5263e1ba6c3bbb666e
-      size: 1732
+      md5: 9baa8691512891742b35753c883d52bf
+      size: 1794
     - path: data/processed/id_mappings.json
       hash: md5
       md5: d43cef6c9b8d5a29ec1a406ad959cd49
       size: 5379246
     - path: data/processed/interactions_fe.parquet
       hash: md5
-      md5: 682343d6a6d8ef3c8e7d8959ddfe12e2
-      size: 8857934
+      md5: 677486347e1b0c67fb685b5c4fdbcf43
+      size: 8857966
   validate:
     cmd: "python -c \"import pandas as pd; df = pd.read_parquet('data/processed/interactions_fe.parquet');
       assert df.shape == (99785, 42), f'Wrong shape: {df.shape}'; assert df['review_score'].isna().sum()
@@ -79,5 +79,5 @@ stages:
     deps:
     - path: data/processed/interactions_fe.parquet
       hash: md5
-      md5: 682343d6a6d8ef3c8e7d8959ddfe12e2
-      size: 8857934
+      md5: 677486347e1b0c67fb685b5c4fdbcf43
+      size: 8857966
