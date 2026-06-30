@@ -62,7 +62,9 @@ uv run mlflow ui --backend-store-uri sqlite:///./artifacts/mlflow.db
 >
 > Vocês já usam sistemas assim todos os dias — quando a Netflix sugere um filme, quando a Amazon mostra 'Clientes que compraram X também compraram Y', ou quando o Spotify monta a playlist 'Descobertas da Semana'. Por trás de cada um há um modelo de machine learning que aprende os padrões de gosto de cada usuário.
 >
-> No nosso caso, vamos usar este dashboard interativo como fio condutor. Aqui no topo temos os **4 KPIs principais** do dataset: **99.785 compras**, **93.358 clientes únicos**, **32.216 produtos diferentes** e **72 categorias** (cama/mesa/banho, beleza/saúde, etc.). Guardem esses números — eles são a base de tudo."
+> No nosso caso, vamos usar este dashboard interativo como fio condutor. Aqui no topo temos os **4 KPIs principais** do dataset: **99.785 compras**, **93.358 clientes únicos**, **32.216 produtos diferentes** e **72 categorias** (cama/mesa/banho, beleza/saúde, etc.). Guardem esses números — eles são a base de tudo.
+>
+> **Uma observação importante antes de começar**: o dataset do Olist, embora seja a referência pública para projetos de recomendação no Brasil, **não é ideal** para esse tipo de problema. Os números que vocês viram — 99 mil compras, mas com 98% cold-start — são consequência de um dataset pequeno, esparso, e com pouca repetição de compra. Isso trouxe **muitos desafios** que vamos discutir ao longo da apresentação, e o resultado final, embora seja **60 vezes melhor que o baseline**, é **modesto em termos absolutos** quando comparado a sistemas de recomendação em datasets mais densos. Vou ser honesto sobre isso em cada etapa."
 
 ---
 
@@ -140,7 +142,9 @@ uv run mlflow ui --backend-store-uri sqlite:///./artifacts/mlflow.db
 >
 > 1. **Tratar como feedback implícito (BPR Loss)** — porque a nota tem muito viés positivo, e o que importa é ranquear.
 > 2. **Log-transform em preço e frete** — para neutralizar a cauda longa.
-> 3. **Priorizar embeddings sobre features engineered** — porque com 98% cold-start, features que dependem de histórico do usuário são ruído para a maioria."
+> 3. **Priorizar embeddings sobre features engineered** — porque com 98% cold-start, features que dependem de histórico do usuário são ruído para a maioria.
+>
+> E aqui vale uma **reflexão honesta sobre o dataset**: essas três decisões não foram 'escolhas sofisticadas' — foram **adaptativas**. Em um dataset denso como o MovieLens, onde cada usuário tem centenas de avaliações, a abordagem clássica (user-item matrix factorization) funciona bem. Mas o Olist nos forçou a repensar tudo. Trabalhar com 99 mil compras e 98% cold-start é, em essência, **trabalhar com 2 mil usuários relevantes** — é um dataset pequeno, esparso, e essa limitação guiou cada decisão técnica daqui em diante."
 
 ---
 
@@ -211,6 +215,9 @@ uv run mlflow ui --backend-store-uri sqlite:///./artifacts/mlflow.db
 
 🧠 **INSIGHT:** "Esse é o **trade-off central** de sistemas com cold-start massivo: features engineered dão sinal global (média), embeddings dão sinal personalizado (mas precisam de histórico). Quando histórico é raro, **menos é mais**."
 
+🗣️ **O QUE DIZER (reflexão honesta):**
+> "Preciso ser transparente aqui: esse resultado — 'a ablation superou o modelo com features' — **não é um sinal de excelência técnica**. Em um dataset denso e bem comportado, a expectativa é que mais features engineered **ajudem** o modelo. O fato de que aqui elas **prejudicam** é um sintoma de que o dataset é pequeno demais para o modelo aprender representações úteis a partir delas. Em outras palavras, **o modelo está 'vencendo por desistência'** — as features não conseguiram competir com a aleatoriedade dos embeddings porque não havia dados suficientes para treiná-las bem."
+
 ---
 
 # PARTE 4 — TREINAMENTO DOS MODELOS (10 min)
@@ -259,7 +266,12 @@ uv run mlflow ui --backend-store-uri sqlite:///./artifacts/mlflow.db
 >
 > Por que 3 dos 4 baselines zeraram? Lembra do cold-start massivo: **98% dos usuários compraram uma vez**. Não existe 'quem comprou X também comprou Y' para um usuário que comprou 1 item. Não existem 'fatores latentes' para um usuário com 1 interação. O único baseline que sobrevive é o **Popularity**, porque ele é **global** — não depende de histórico individual."
 
-💡 **DICA:** Este é o momento de **preparar o terreno** para a próxima seção: "Mas a abordagem neural muda completamente esse jogo. Vamos ver."
+�️ **O QUE DIZER (reflexão honesta):**
+> "Aqui eu preciso pausar e ser direto: **3 dos 4 baselines zerarem não é 'o problema é difícil' — é o problema sendo impossível para essas técnicas neste dataset**. Item-Item CF é o algoritmo que **recomendou livros na Amazon por uma década** e ganhou o prêmio Netflix. TruncatedSVD é o estado da arte em fatoração de matrizes há 20 anos. Eles não são fracos — eles simplesmente **não foram feitos** para datasets onde 98% dos usuários compraram uma única vez.
+>
+> Isso significa que a Popularity Baseline, com seu NDCG de 0,0053, é tecnicamente o **melhor modelo possível que não usa deep learning** neste dataset. É o teto. E ele é **muito baixo**. Esse é um sinal claro de que o Olist não é o dataset ideal para benchmarks de recomendação — e explica por que a literatura acadêmica usa MovieLens, Amazon Reviews (5-core) ou Yelp, que filtram agressivamente para garantir densidade."
+
+� **DICA:** Este é o momento de **preparar o terreno** para a próxima seção: "Mas a abordagem neural muda completamente esse jogo. Vamos ver."
 
 ---
 
@@ -279,6 +291,11 @@ uv run mlflow ui --backend-store-uri sqlite:///./artifacts/mlflow.db
 > A arquitetura é simples: **3 embeddings** (usuário com 32 dimensões, item com 32, categoria com 8) são concatenados e passam por um **MLP de 2 camadas** (64 → 32 → 1). O output é um score. Treinamos com **BPR Loss**: para cada interação positiva, mostramos 8 negativas, e o modelo aprende a dar scores **maiores** para os positivos.
 >
 > E os resultados? **NDCG@10 = 0,2725** — cinquenta vezes melhor que o baseline de popularidade! **49% dos top-10 contém pelo menos um item relevante**. Isso é uma transformação qualitativa."
+
+🗣️ **O QUE DIZER (reflexão honesta):**
+> "Vou ser honesto sobre esse número: **NDCG = 0,2725 não é um número grande**. Em sistemas de recomendação academicamente competitivos, você encontra NDCG na faixa de **0,4 a 0,6**. Estamos bem abaixo disso. Mas atenção: **o contexto importa**. Esse número é 60× maior que o baseline mais forte que conseguimos treinar (Popularity, 0,0045). E o baseline mais forte, em datasets densos, costuma estar na faixa de 0,15-0,25 — ou seja, nosso baseline é **10× mais fraco** que o baseline de um dataset denso.
+>
+> Traduzindo: **se o nosso baseline fosse 0,05, o NCF precisaria atingir ~0,40 para ser competitivo**. Aqui, o NCF atinge 0,27 partindo de um baseline de 0,005. O **lift relativo** é enorme, mas o **número absoluto** carrega a marca do dataset fraco. Em produção, mesmo um NDCG de 0,27 com 49% de HitRate já é utilizável — é o suficiente para uma home page com recomendações relevantes."
 
 ---
 
@@ -371,6 +388,8 @@ uv run mlflow ui --backend-store-uri sqlite:///./artifacts/mlflow.db
 >
 > **3. Cold-start massivo muda a equação.** Em datasets densos (MovieLens, Amazon), features engineered brilham. Em datasets esparsos como o Olist, embeddings treinados superam. **Saber qual é o seu caso é metade do problema**.
 >
+> E uma **4ª lição que eu acrescentaria** depois desse projeto: **a escolha do dataset importa mais do que a escolha do modelo**. Gastamos horas ajustando hiperparâmetros, fazendo ablation studies, e o resultado final de NDCG=0,27 ainda é modesto. Se tivéssemos começado com o MovieLens 25M (25 milhões de ratings, 162 mil usuários com média de 162 ratings cada), o **mesmo NCF** provavelmente passaria de NDCG=0,4 sem tuning. O Olist foi escolhido por ser um **dataset público brasileiro** e por ser didático, mas didático ≠ fácil. Para quem vai começar um projeto de recomendação: **invistam tempo escolhendo o dataset antes de escolher o modelo**.
+>
 > Obrigado. Perguntas?"
 
 ---
@@ -452,6 +471,31 @@ uv run mlflow ui --backend-store-uri sqlite:///./artifacts/mlflow.db
 > - **A/B testing** para medir impacto em CTR/conversão
 >
 > Para um Tech Challenge, o modelo de ML é a parte visível, mas em produção **90% do trabalho é engenharia de software** — pipelines de dados, latência, resiliência, observabilidade. O nosso próximo passo é exatamente esse: pegar o modelo e empacotar tudo."
+
+---
+
+### P9: "O dataset do Olist foi uma boa escolha? Vocês escolheriam de novo?"
+
+📖 **GLOSSÁRIO:**
+- **Dataset público**: dados disponibilizados abertamente para a comunidade usar em projetos e competições. O Olist é um dos mais usados no Brasil.
+
+🗣️ "Vou ser direto: **o Olist foi a escolha possível, não a ideal**. Escolhemos ele por ser (1) público, (2) brasileiro — o que dá contexto para a apresentação — e (3) real, com problemas reais. Mas, em termos de **benchmarking de recomendação**, ele é desafiador demais para o objetivo de mostrar que um modelo 'funciona bem'.
+>
+> O que eu faria diferente hoje? Usaria o **MovieLens 25M** (25 milhões de ratings, 162 mil usuários com 162 ratings médios cada) ou o **Amazon Reviews 5-core** (filtrado para garantir que cada usuário e produto tenha pelo menos 5 interações). Esses datasets têm cold-start **resolvido por construção**, permitindo focar no **modelo** em vez de lutar contra os dados.
+>
+> Dito isso, trabalhar com um dataset difícil trouxe **aprendizados que um dataset fácil não traria**: o valor de uma boa EDA, a importância de questionar feature selection estatística, e a coragem de remover features que pareciam úteis. Esses aprendizados são transferíveis para qualquer projeto. Então a resposta final é: **o Olist foi desafiador, mas nos ensinou mais do que um dataset fácil teria ensinado**."
+
+---
+
+### P10: "O resultado final é bom? Valeu a pena?"
+
+🗣️ "Vou separar em duas respostas: **técnica** e **de aprendizado**.
+>
+> **Tecnicamente**: NDCG=0,27 é **modesto em absoluto**, mas é **excelente em relativo** (60× sobre o baseline). Em produção, esse número é **utilizável** — significa que 50% dos top-10 têm pelo menos um item relevante. Em e-commerce real, isso já é o suficiente para gerar impacto de receita.
+>
+> **De aprendizado**: valeu **muito a pena**. Construir um sistema de recomendação end-to-end — da EDA ao modelo em produção, passando por baselines, ablation, MLflow e deploy do dashboard — é o tipo de experiência que **não se consegue lendo**. Os trade-offs que enfrentamos (cold-start, target leakage, correlação vs redundância, escolha de loss function) são exatamente o que se vê em entrevistas técnicas e em projetos reais.
+>
+> Então a resposta curta: **o resultado técnico é modesto por causa do dataset, mas o resultado educacional é excelente**. E esse é o ponto que mais importa nesse Tech Challenge."
 
 ---
 
