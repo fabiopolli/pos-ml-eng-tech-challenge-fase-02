@@ -522,13 +522,14 @@ Para a explicação matemática detalhada (fórmulas e implementação), consult
 11. **Notebook NCF:** `notebooks/04_ncf_training_results.ipynb` com análise completa.
 12. **Relatório de Otimização:** `reports/ncf_optimization_report.md` com findings.
 13. **Auditoria Spearman de Features Redundantes:** Rodada extra de feature selection via correlação de Spearman. Identificadas e removidas 2 features redundantes (`user_recency_days`, `freight_value_log`). Decisão arquitetural: **manter `Ablation_FINAL_no_aux_emb32` como Production** (NDCG=0.2725, 60× vs baseline) — única configuração que supera todas as variantes com aux features. Relatório completo em `reports/feature_audit_spearman.md`; detalhes na Seção 7.6 deste documento.
+14. **Model Card:** Documentação formal de métricas e limitações.
+15. **Containerização (Docker):** API construída com FastAPI e empacotada via Dockerfile, expondo o modelo de Produção.
 
 ### ⏳ Pendentes
-1.  **Containerização:** Preparar o Dockerfile multi-stage de produção.
-2.  **Implementação em Cloud:** Deploy em AWS/GCP/Azure com endpoint público.
-3.  **Model Card:** Documentação formal de métricas e limitações.
-4.  **Vídeo STAR:** Apresentação de 5 minutos para a banca.
-5.  **ETAPA 1 — Clean Code (sessão 2026-06-27):** Refatoração `evaluate_model()` em `src/training/evaluate.py` (121→73 linhas via 5 helpers); refatoração `evaluate_model()` em `src/train.py` (45→28 linhas via 2 helpers); consolidação `pyproject.toml` para PEP 621 puro com hatchling, remoção do `[tool.poetry]` duplicado; criação de `docs/NAMING_CONVENTIONS.md` (convenções, prefixos, sufixos, exemplos); criação de `docs/SRP_RESPONSIBILITIES.md` (mapa de módulos, anti-patterns, dependências); preenchimento de 4 docstrings públicas em `src/` (100% cobertura); Ruff zerado em `src/` e `scripts/` — All checks passed.
+
+1.  **Implementação em Cloud:** Deploy em AWS/GCP/Azure com endpoint público.
+2.  **Vídeo STAR:** Apresentação de 5 minutos para a banca.
+3.  **ETAPA 1 — Clean Code (sessão 2026-06-27):** Refatoração `evaluate_model()` em `src/training/evaluate.py` (121→73 linhas via 5 helpers); refatoração `evaluate_model()` em `src/train.py` (45→28 linhas via 2 helpers); consolidação `pyproject.toml` para PEP 621 puro com hatchling, remoção do `[tool.poetry]` duplicado; criação de `docs/NAMING_CONVENTIONS.md` (convenções, prefixos, sufixos, exemplos); criação de `docs/SRP_RESPONSIBILITIES.md` (mapa de módulos, anti-patterns, dependências); preenchimento de 4 docstrings públicas em `src/` (100% cobertura); Ruff zerado em `src/` e `scripts/` — All checks passed.
 
 ---
 
@@ -592,6 +593,17 @@ uv run pytest -v
 uv run ruff check . --fix
 uv run ruff format .
 ```
+
+**Containerização e Orquestração (Docker Compose):**
+```bash
+# Constrói as imagens e sobe os serviços de API e MLflow simultaneamente
+docker compose up --build
+
+# A interface da API (Swagger UI) ficará em: http://localhost:8000/docs
+# A interface do MLflow ficará em: http://localhost:5000
+
+# Para desligar os serviços:
+# Pressione Ctrl+C no terminal ou rode: docker compose down
 
 ---
 

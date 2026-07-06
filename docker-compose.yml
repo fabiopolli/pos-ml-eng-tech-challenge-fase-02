@@ -1,0 +1,21 @@
+services:
+  # 1. Nossa API de Recomendação
+  api:
+    build: .
+    container_name: olist_recommender_api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./artifacts:/app/artifacts
+    depends_on:
+      - mlflow
+
+  # 2. Servidor do MLflow para Tracking
+  mlflow:
+    build: .
+    container_name: olist_mlflow_server
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./artifacts:/app/artifacts
+    command: ["mlflow", "server", "--backend-store-uri", "sqlite:////app/artifacts/mlflow.db", "--host", "0.0.0.0", "--port", "5000"]

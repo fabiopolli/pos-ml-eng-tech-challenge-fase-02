@@ -227,10 +227,10 @@
 
 ### 3.4 Docker
 
-- [ ] Dockerfile multi-stage (`builder` deps + `runtime` app)
-- [ ] Imagem final otimizada (slim/alpine, sem cache de build)
-- [ ] `docker-compose.yml` com serviço de treino + MLflow server
-- [ ] Testar build local: `docker build .` e `docker compose up`
+- [X] Dockerfile multi-stage (`builder` deps + `runtime` app)
+- [X] Imagem final otimizada (slim/alpine, sem cache de build)
+- [X] `docker-compose.yml` com serviço de treino + MLflow server
+- [X] Testar build local: `docker build .` e `docker compose up`
 
 ### 3.5 MLflow Tracking (>= 3 runs)
 
