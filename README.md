@@ -32,9 +32,9 @@ Este projeto implementa um sistema de recomendação end-to-end utilizando o dat
 - [x] **Design patterns:** Factory (modelos) + Strategy (preprocessors)
 - [x] **Lint:** Ruff zero warnings em `src/` e `scripts/`
 - [x] **Auditoria Spearman de features redundantes** (relatório em `reports/feature_audit_spearman.md`)
-- [ ] Dockerfile multi-stage
+- [X] **Dockerfile multi-stage e Docker Compose** (API FastAPI + MLflow)
 - [ ] Deploy em cloud
-- [ ] Model Card
+- [X] Model Card
 - [ ] Vídeo STAR (5 min)
 
 ---
@@ -220,6 +220,9 @@ uv run streamlit run front/app_vis.py
 
 # 8. MLflow UI (em outro terminal)
 uv run mlflow ui --backend-store-uri sqlite:///./artifacts/mlflow.db
+
+# 9. Executar via Docker Compose (Ambiente de Produção Local)
+docker compose up --build
 ```
 
 ---
