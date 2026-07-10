@@ -62,7 +62,7 @@ stages:
       size: 2656
     - path: data/processed/feature_metadata.json
       hash: md5
-      md5: 698a73ba4e5545380d03e5a025048b72
+      md5: b72da23ddba98c25ea1d14dc75089f48
       size: 1794
     - path: data/processed/id_mappings.json
       hash: md5
