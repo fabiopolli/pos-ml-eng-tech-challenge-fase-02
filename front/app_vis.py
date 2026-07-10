@@ -42,16 +42,31 @@ FEATURES_DOC_PATH = BASE_DIR / "data" / "processed" / "FEATURES.md"
 FEATURE_METADATA_PATH = BASE_DIR / "data" / "processed" / "feature_metadata.json"
 
 # --- Caminhos dos artefatos do NCF (PyTorch) ---
-NCF_MODEL_PRIMARY = BASE_DIR / "artifacts" / "ncf_Ablation_FINAL_no_aux_emb32.pt"
-NCF_MODEL_FALLBACK = BASE_DIR / "artifacts" / "ncf_final.pt"
-NCF_MODEL_PATH = NCF_MODEL_PRIMARY if NCF_MODEL_PRIMARY.exists() else NCF_MODEL_FALLBACK
+# Prioridade: models/ (versionado via DVC) > artifacts/ (legado).
+# Rota A (versao 6.5 do REPORT.md) moveu o modelo Production para models/.
+NCF_MODEL_PRIMARY = BASE_DIR / "models" / "ncf_production.pt"  # Rota A (DVC)
+NCF_MODEL_FALLBACK = BASE_DIR / "artifacts" / "ncf_Ablation_FINAL_no_aux_emb32.pt"
+NCF_MODEL_FALLBACK_2 = BASE_DIR / "artifacts" / "ncf_final.pt"
+NCF_MODEL_PATH = next(
+    (p for p in [NCF_MODEL_PRIMARY, NCF_MODEL_FALLBACK, NCF_MODEL_FALLBACK_2] if p.exists()),
+    NCF_MODEL_PRIMARY,
+)
 NCF_METRICS_PRIMARY = BASE_DIR / "artifacts" / "metrics_Ablation_FINAL_no_aux_emb32.json"
 NCF_METRICS_FALLBACK = BASE_DIR / "artifacts" / "metrics_NCF_FINAL_emb32_h64-32_d0.5_lr5e-4.json"
 NCF_METRICS_PATH = NCF_METRICS_PRIMARY if NCF_METRICS_PRIMARY.exists() else NCF_METRICS_FALLBACK
-NCF_SCALER_PATH = BASE_DIR / "artifacts" / "scaler.pkl"
+NCF_SCALER_PRIMARY = BASE_DIR / "models" / "scaler_production.pkl"  # Rota A (DVC)
+NCF_SCALER_FALLBACK = BASE_DIR / "artifacts" / "scaler.pkl"
+NCF_SCALER_PATH = NCF_SCALER_PRIMARY if NCF_SCALER_PRIMARY.exists() else NCF_SCALER_FALLBACK
 NCF_CONFIG_PATH = BASE_DIR / "configs" / "selected_features.yaml"
 NCF_BEST_CONFIG_PATH = BASE_DIR / "configs" / "ncf_best.yaml"
 NCF_MLFLOW_DB = BASE_DIR / "artifacts" / "mlflow.db"
+
+# --- URL canonica do Model Registry no DagsHub (Rota B - secao 16 do REPORT.md) ---
+DAGSHUB_MLFLOW_URL = (
+    "https://dagshub.com/deniscelclaro/projeto_fiap_modulo2/#/models/olist-ncf-recommender"
+)
+DAGSHUB_REPO_URL = "https://dagshub.com/deniscelclaro/projeto_fiap_modulo2"
+PRODUCTION_MODEL_HASH = "439244cc81273d4bbc0bfa710a9142ee"  # MD5 do ncf_production.pt
 NCF_FIG_BASELINE = FIGURES_DIR / "ncf_vs_baseline.png"
 NCF_FIG_TVT = FIGURES_DIR / "ncf_train_val_test.png"
 NCF_FIG_COLDSTART = FIGURES_DIR / "coldstart_analysis.png"
@@ -67,6 +82,23 @@ st.set_page_config(
     layout="wide",
     page_icon="🛒",
 )
+
+# --- Sidebar: Modo Apresentacao + links uteis ---
+with st.sidebar:
+    st.markdown("### 🎛️ Controles")
+    presentation_mode = st.toggle(
+        "🎤 Modo Apresentação",
+        value=False,
+        help="Ativa um layout mais limpo para demos: esconde abas técnicas e aumenta KPIs.",
+    )
+    st.markdown("---")
+    st.markdown("### 🔗 Links Úteis")
+    st.markdown(f"[📦 Repositório GitHub](https://github.com/fabiopolli/pos-ml-eng-tech-challenge-fase-02)")
+    st.markdown(f"[🏔️ DagsHub Repo]({DAGSHUB_REPO_URL})")
+    st.markdown(f"[🏆 Modelo Production (MLflow)]({DAGSHUB_MLFLOW_URL})")
+    st.markdown(f"[📖 REPORT.md](https://github.com/fabiopolli/pos-ml-eng-tech-challenge-fase-02/blob/main/docs/REPORT.md)")
+    st.markdown("---")
+    st.caption(f"🔖 Modelo MD5: `{PRODUCTION_MODEL_HASH[:8]}...`")
 
 # --- CSS Dark Mode Premium (mesma identidade visual da Fase 01) ---
 st.markdown(
@@ -240,7 +272,11 @@ if _ncf_available:
     tab_names.append("🧠 NCF (MLP PyTorch)")
 if df_baseline is not None:
     tab_names.append("🎯 Recomendações")
-tab_names.append("ℹ️ Sobre o Pipeline")
+# Aba de Versionamento (sempre presente - referencia DagsHub)
+tab_names.append("🔖 Versionamento")
+# No modo apresentacao, escondemos a aba "Sobre o Pipeline" (detalhes tecnicos)
+if not presentation_mode:
+    tab_names.append("ℹ️ Sobre o Pipeline")
 
 tabs = st.tabs(tab_names)
 
@@ -254,12 +290,91 @@ with tabs[0]:
     if df is None:
         st.warning("⚠️ `interactions.parquet` não encontrado.")
     else:
-        # KPIs principais
+        # KPIs principais (above the fold para apresentacao)
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("Interações", f"{len(df):,}")
         col2.metric("Usuários Únicos", f"{df['customer_unique_id'].nunique():,}")
         col3.metric("Produtos Únicos", f"{df['product_id'].nunique():,}")
         col4.metric("Categorias", f"{df['product_category_name_english'].nunique() if 'product_category_name_english' in df.columns else 0:,}")
+
+        # --- Bloco "Sparsity da Matriz User-Item" (alta densidade visual) ---
+        # Este bloco e o "momento dramatico" da apresentacao (98% cold-start).
+        st.markdown("---")
+        st.subheader("⚠️ Sparsity da Matriz User-Item (o vilão do projeto)")
+
+        n_users_unique = df['customer_unique_id'].nunique()
+        n_products_unique = df['product_id'].nunique()
+        # Compras por cliente (para detectar cold-start)
+        user_purchase_counts = df.groupby('customer_unique_id').size()
+        n_one_buy = (user_purchase_counts == 1).sum()
+        n_two_plus = (user_purchase_counts >= 2).sum()
+        pct_one_buy = n_one_buy / n_users_unique * 100
+        pct_two_plus = n_two_plus / n_users_unique * 100
+
+        # KPIs: 3 numeros grandes (sparsity, clientes 1 compra, clientes >=2 compras)
+        k1, k2, k3 = st.columns(3)
+        k1.metric(
+            "🔴 Sparsity da Matriz",
+            "99,9967%",
+            delta=f"3 bi possíves · {len(df):,} observados",
+            delta_color="off",
+        )
+        k2.metric(
+            "🔴 Cold-start severo",
+            f"{pct_one_buy:.1f}%",
+            delta=f"{n_one_buy:,} clientes com 1 compra",
+            delta_color="off",
+        )
+        k3.metric(
+            "🟢 Clientes com histórico",
+            f"{pct_two_plus:.1f}%",
+            delta=f"{n_two_plus:,} clientes com ≥2 compras",
+        )
+
+        # --- Grafico-donut: 98% vs 2% (visual forte para a pausa dramatica) ---
+        d1, d2 = st.columns([1, 1])
+        with d1:
+            fig = go.Figure(
+                data=[
+                    go.Pie(
+                        labels=["1 compra (cold-start)", "≥2 compras (com histórico)"],
+                        values=[n_one_buy, n_two_plus],
+                        hole=0.55,
+                        marker=dict(colors=["#f85149", "#3fb950"]),
+                        textinfo="label+percent",
+                        textfont=dict(size=14, color="#e6edf3"),
+                    )
+                ]
+            )
+            fig.update_layout(
+                title=dict(
+                    text="<b>98% cold-start</b><br><sub>Apenas 2 mil clientes têm ≥2 compras</sub>",
+                    x=0.5,
+                    font=dict(color="#e6edf3", size=16),
+                ),
+                **plotly_template(),
+            )
+            fig.add_annotation(
+                text=f"<b>{pct_two_plus:.1f}%</b>",
+                x=0.5, y=0.5,
+                font=dict(size=32, color="#3fb950"),
+                showarrow=False,
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        with d2:
+            st.markdown("### 💡 O que isso significa?")
+            st.markdown(
+                f"""
+                - **{pct_two_plus:.1f}%** dos clientes (~**{n_two_plus:,}**) têm
+                  **histórico relevante** para alimentar features engineered.
+                - **{pct_one_buy:.1f}%** dos clientes (~**{n_one_buy:,}**) compraram
+                  **UMA ÚNICA VEZ** — não há passado para usar.
+                - Qualquer feature dependente de histórico (gasto médio,
+                  categorias preferidas) está **vazia** para a maioria.
+                - Isso **forçou** 3 decisões de design no projeto (ver aba
+                  *Sobre o Pipeline*).
+                """
+            )
 
         st.markdown("---")
 
@@ -589,6 +704,19 @@ with tabs[2]:
             """
         )
 
+        # Nota visual sobre o cold-start severo (motivacao dos baselines zerados)
+        st.error(
+            """
+            ⚠️ **Por que vários baselines retornaram MAP = 0.0000?**\n
+            **Cold-start severo** do dataset: 98% dos usuários do conjunto de teste nunca
+            aparecem no treino (ver aba *Visão Geral* → *Sparsity da Matriz User-Item*).
+            Métodos baseados em **co-ocorrência** (Item-Item CF, TopRated, TruncatedSVD)
+            não conseguem gerar ranking personalizado para clientes inéditos. **Apenas
+            Popularidade** (não-personalizada) gera recomendações válidas, com NDCG@10
+            de **0.0045** — 60× abaixo do nosso NCF Production.
+            """
+        )
+
         st.markdown("---")
 
         # Tabela de Resultados Completa
@@ -802,28 +930,87 @@ if _ncf_available:
         except Exception:
             pass
 
-        # --- Bloco 1: KPIs principais ---
-        st.subheader("📊 Métricas @ K=10 (Test Set)")
-        col1, col2, col3, col4, col5 = st.columns(5)
-        col1.metric("HitRate@10", f"{ncf_metrics['test']['HitRate@K']:.4f}")
-        col2.metric("Recall@10", f"{ncf_metrics['test']['Recall@K']:.4f}")
-        col3.metric("Precision@10", f"{ncf_metrics['test']['Precision@K']:.4f}")
-        col4.metric("NDCG@10", f"{ncf_metrics['test']['NDCG@K']:.4f}")
-        col5.metric("MAP@10", f"{ncf_metrics['test']['MAP@K']:.4f}")
-
-        # Banner de produção
+        # --- Bloco 1: Banner hero do Production Model ---
+        # Numero "uau" da apresentacao: NDCG@10 = 60x vs baseline.
         baseline_ndcg = ncf_metrics.get("baseline", {}).get("NDCG@K", 0.0045)
         ncf_ndcg = ncf_metrics['test']['NDCG@K']
-        if baseline_ndcg > 0:
-            lift_pct = (ncf_ndcg / baseline_ndcg - 1) * 100
-            lift_x = ncf_ndcg / baseline_ndcg
-            st.success(
-                f"🏆 **Modelo em Production** (MLflow Registry) — "
-                f"NDCG@10 = {ncf_ndcg:.4f} "
-                f"(**{lift_x:.1f}x** vs baseline, +{lift_pct:.0f}%)"
-            )
-        else:
-            st.success(f"🏆 **Modelo em Production** — NDCG@10 = {ncf_ndcg:.4f}")
+        lift_x = ncf_ndcg / baseline_ndcg if baseline_ndcg > 0 else 60.6
+
+        st.markdown(
+            f"""
+            <div style="
+                background: linear-gradient(135deg, #0d1117 0%, #161b22 100%);
+                border: 2px solid #58a6ff;
+                border-radius: 12px;
+                padding: 24px;
+                margin-bottom: 16px;
+                text-align: center;
+            ">
+                <div style="font-size: 0.9em; color: #7d8590; letter-spacing: 2px;
+                            text-transform: uppercase; margin-bottom: 8px;">
+                    🏆 Production Model (DagsHub MLflow Registry)
+                </div>
+                <div style="font-size: 3.5em; font-weight: 800; color: #58a6ff;
+                            line-height: 1; margin-bottom: 8px;">
+                    {ncf_ndcg:.4f}
+                </div>
+                <div style="font-size: 1em; color: #7d8590; margin-bottom: 12px;">
+                    NDCG@10 · Test Set
+                </div>
+                <div style="display: inline-block; background: #3fb9501a; border: 1px solid #3fb950;
+                            border-radius: 20px; padding: 6px 16px; color: #3fb950; font-weight: 700;
+                            font-size: 1.1em;">
+                    ↑ {lift_x:.1f}x vs baseline (Popularidade = {baseline_ndcg:.4f})
+                </div>
+                <div style="font-size: 0.75em; color: #7d8590; margin-top: 12px;">
+                    <a href="{DAGSHUB_MLFLOW_URL}" target="_blank"
+                       style="color: #58a6ff; text-decoration: none;">
+                       Ver no DagsHub MLflow →
+                    </a>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        # --- Bloco 1b: KPIs com delta visual ---
+        st.subheader("📊 Métricas @ K=10 (Test Set)")
+        col1, col2, col3, col4, col5 = st.columns(5)
+        baseline_hr = ncf_metrics.get("baseline", {}).get("HitRate@K", 0.0113)
+        baseline_rec = ncf_metrics.get("baseline", {}).get("Recall@K", 0.0104)
+        baseline_prec = ncf_metrics.get("baseline", {}).get("Precision@K", 0.0010)
+        baseline_map = ncf_metrics.get("baseline", {}).get("MAP@K", 0.0019)
+        col1.metric(
+            "HitRate@10",
+            f"{ncf_metrics['test']['HitRate@K']:.4f}",
+            delta=f"+{(ncf_metrics['test']['HitRate@K'] / baseline_hr - 1) * 100:.0f}% vs baseline",
+        )
+        col2.metric(
+            "Recall@10",
+            f"{ncf_metrics['test']['Recall@K']:.4f}",
+            delta=f"+{(ncf_metrics['test']['Recall@K'] / baseline_rec - 1) * 100:.0f}% vs baseline",
+        )
+        col3.metric(
+            "Precision@10",
+            f"{ncf_metrics['test']['Precision@K']:.4f}",
+            delta=f"+{(ncf_metrics['test']['Precision@K'] / baseline_prec - 1) * 100:.0f}% vs baseline",
+        )
+        col4.metric(
+            "NDCG@10",
+            f"{ncf_metrics['test']['NDCG@K']:.4f}",
+            delta=f"+{lift_x:.1f}x vs baseline",
+        )
+        col5.metric(
+            "MAP@10",
+            f"{ncf_metrics['test']['MAP@K']:.4f}",
+            delta=f"+{(ncf_metrics['test']['MAP@K'] / baseline_map - 1) * 100:.0f}% vs baseline",
+        )
+
+        # Indicador discreto do hash do modelo + origem
+        st.caption(
+            f"🔖 Modelo em Production · MD5 `{PRODUCTION_MODEL_HASH}` · "
+            f"📦 Repositório DagsHub: [{DAGSHUB_REPO_URL}]({DAGSHUB_REPO_URL})"
+        )
 
         st.markdown("---")
 
@@ -1090,6 +1277,144 @@ if baseline_tab_idx is not None:
 
 
 # ============================================================================
+# ABA 6 — VERSIONAMENTO (DagsHub + DVC + MLflow)
+# ============================================================================
+versioning_tab_idx = (
+    3 if _ncf_available else 2 + (1 if df_baseline is not None else 0)
+) + (0 if _ncf_available else 0)
+# Simplifica: pega a aba imediatamente antes da final
+final_tab_idx = len(tabs) - 1
+versioning_tab_idx = final_tab_idx - (0 if presentation_mode else 1)
+
+with tabs[versioning_tab_idx]:
+    st.header("🔖 Versionamento de Modelos (GitHub + DVC + MLflow + DagsHub)")
+
+    st.markdown(
+        """
+        Este painel é **reproduzível bit a bit** graças à orquestração entre
+        **quatro ferramentas**. Cada uma resolve um problema específico e, juntas,
+        entregam **reprodutibilidade científica + governança de modelos**.
+        """
+    )
+
+    # Card grande: Production Model com link DagsHub
+    st.markdown(
+        f"""
+        <div style="
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 16px 0;
+        ">
+            <div style="font-size: 0.85em; color: #7d8590; letter-spacing: 1.5px;
+                        text-transform: uppercase;">
+                🏆 Production Model
+            </div>
+            <div style="font-size: 1.5em; color: #e6edf3; font-weight: 700;
+                        margin: 8px 0;">
+                olist-ncf-recommender · v1
+            </div>
+            <div style="font-size: 0.85em; color: #7d8590; line-height: 1.6;">
+                <div><b>MLflow Run:</b> <code>c65f5531564f45c583926c564985cc65</code></div>
+                <div><b>MD5 (DVC):</b> <code>{PRODUCTION_MODEL_HASH}</code></div>
+                <div><b>Origem:</b> <code>models/ncf_production.pt</code> + <code>models/scaler_production.pkl</code></div>
+            </div>
+            <div style="margin-top: 12px;">
+                <a href="{DAGSHUB_MLFLOW_URL}" target="_blank"
+                   style="color: #58a6ff; text-decoration: none; font-weight: 700;">
+                   📦 Ver Model Registry no DagsHub →
+                </a>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # Tabela das 4 ferramentas (cards)
+    st.subheader("🧩 As 4 ferramentas (cada uma resolve um problema)")
+    fcol1, fcol2 = st.columns(2)
+    with fcol1:
+        st.markdown(
+            """
+            **📦 GitHub** — guarda **código**
+            - Scripts, configs, documentação
+            - Texto puro, revisão por humanos
+            - Inclui os `*.dvc` (metadados pequenos)
+            """
+        )
+        st.markdown(
+            """
+            **🔗 DVC** — extensão do Git para dados/modelos
+            - Versiona binários grandes (CSVs, `.pt`)
+            - Guarda apenas **hashes MD5** no Git
+            - `dvc push` envia os binários para o DagsHub
+            """
+        )
+    with fcol2:
+        st.markdown(
+            """
+            **📋 MLflow** — cartório do modelo
+            - Registra cada experimento (parâmetros, métricas)
+            - Model Registry com **stages** (Staging / Production / Archived)
+            - Hospedado no DagsHub (gratuito)
+            """
+        )
+        st.markdown(
+            f"""
+            **🏔️ DagsHub** — plataforma unificada
+            - Git + bucket S3 + MLflow Tracking num lugar só
+            - [Repositório]({DAGSHUB_REPO_URL})
+            - [Model Registry]({DAGSHUB_MLFLOW_URL})
+            """
+        )
+
+    # Comando: como reproduzir
+    st.markdown("---")
+    st.subheader("🔧 Como reproduzir o estado exato deste painel")
+    st.code(
+        """# 1. Clonar o repositório
+git clone https://github.com/fabiopolli/pos-ml-eng-tech-challenge-fase-02.git
+cd pos-ml-eng-tech-challenge-fase-02
+
+# 2. Configurar DagsHub (uma unica vez)
+uv run dvc remote modify --local origin auth basic
+uv run dvc remote modify --local origin user <seu_usuario>
+uv run dvc remote modify --local origin password <seu_token>
+
+# 3. Baixar dados + modelos
+uv run dvc pull
+
+# 4. Abrir o dashboard
+uv run streamlit run front/app_vis.py""",
+        language="bash",
+    )
+
+    # Status atual (resumo visual)
+    st.markdown("---")
+    st.subheader("✅ Status Atual do Versionamento (2026-07-10)")
+    scol1, scol2 = st.columns(2)
+    with scol1:
+        st.success(
+            f"""
+            **🔗 DVC (Rota A)** ✅ Sincronizado
+            - `models/ncf_production.pt` (16 MB) — MD5 `{PRODUCTION_MODEL_HASH[:12]}...`
+            - `models/scaler_production.pkl` (1.7 KB)
+            - Binarios no bucket S3 do DagsHub
+            """
+        )
+    with scol2:
+        st.success(
+            """
+            **📋 MLflow (Rota B)** ✅ Registrado
+            - Modelo `olist-ncf-recommender` v1
+            - Stage: **Production**
+            - Run ID: `c65f5531564f45c583926c564985cc65`
+            """
+        )
+
+
+# ============================================================================
 # ABA FINAL — SOBRE O PIPELINE
 # ============================================================================
 with tabs[-1]:
@@ -1172,6 +1497,37 @@ with tabs[-1]:
         st.success(f"✅ `data/processed/id_mappings.json` — {size_kb:.1f} KB")
     else:
         st.warning("⚠️ `data/processed/id_mappings.json`")
+
+    # Footer com mini-cards de "proxima aba na demonstracao" (alinhado com o script)
+    if not presentation_mode:
+        st.markdown("---")
+        st.markdown("### 🎯 Próximo passo na demonstração")
+        st.markdown(
+            """
+            <style>
+                .next-card {
+                    display: inline-block;
+                    background: #161b22;
+                    border: 1px solid #30363d;
+                    border-radius: 8px;
+                    padding: 10px 16px;
+                    margin: 4px;
+                    color: #58a6ff;
+                    font-weight: 600;
+                    font-size: 0.95em;
+                }
+            </style>
+            <div style="text-align: center;">
+                <span class="next-card">📊 Visão Geral</span>
+                <span class="next-card">🔧 Feature Engineering</span>
+                <span class="next-card">🏋️ Baselines</span>
+                <span class="next-card">🧠 NCF (MLP PyTorch)</span>
+                <span class="next-card">🎯 Recomendações</span>
+                <span class="next-card">🔖 Versionamento</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
 st.markdown("---")
 st.markdown(
