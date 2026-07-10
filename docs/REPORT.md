@@ -180,6 +180,85 @@ Ferramentas essenciais para escalabilidade, versionamento e governança metodol�
 | `uv run ruff check .` | Invoca a suíte estática avaliando anomalias estruturais ou falhas de formatação não condizentes com boas práticas. | Ruff |
 | `uv run pytest` | Aciona a integração de testes unitários mitigando potenciais regressões ou bugs nos sub-módulos lógicos. | Pytest |
 
+### 6.5 Pipeline DVC + DagsHub
+
+O versionamento de dados e modelos adota o **DVC (Data Version Control)** integrado ao **DagsHub** como _remote storage_ unificado. A configuração está centralizada em [`.dvc/config`](../.dvc/config):
+
+```ini
+[core]
+    no_scm = true
+    remote = origin
+['remote "origin"']
+    url = https://dagshub.com/deniscelclaro/projeto_fiap_modulo2.dvc
+```
+
+#### Por que DagsHub (e não Google Drive / S3 manual / LakeFS)?
+
+| Alternativa Avaliada | Veredito | Justificativa |
+|---|---|---|
+| Versionar CSVs direto no Git | ❌ Rejeitado | Git LFS oneroso; arquivos grandes poluem o histórico. |
+| Google Drive com Service Account (configuração anterior) | ❌ Rejeitado | Erro recorrente `Service Accounts do not have storage quota`; dependência do plugin `dvc-gdrive`; credenciais JSON locais. |
+| S3 / MinIO manual | ❌ Rejeitado | Sem versionamento real; upload sobrescreve arquivo anterior; sem rastreabilidade. |
+| LakeFS / Delta Lake | ❌ Rejeitado | Over-engineering para o escopo do Tech Challenge; exige infraestrutura dedicada. |
+| **DVC + DagsHub** | ✅ **Adotado** | Versionamento real, reprodutibilidade ponta a ponta, autenticação por token e custo zero. |
+
+Os cinco atributos decisivos que consolidaram a escolha:
+
+1. **Reprodutibilidade experimental ponta a ponta** — cada execução do MLflow fica atrelada a um _commit_ Git específico e a um _hash_ DVC, permitindo reconstruir o modelo Production a partir do estado exato dos dados e do código.
+2. **Separação clara de responsabilidades** — GitHub guarda código, scripts e documentação; DagsHub armazena dados brutos, datasets processados e artefatos pesados; o MLflow, hospedado no próprio DagsHub, centraliza métricas, hiperparâmetros e modelos serializados, formando uma tríade MLOps coesa em uma única plataforma.
+3. **Onboarding sem fricção de credenciais** — substitui o JSON da Service Account e o plugin `dvc-gdrive` por autenticação via token pessoal (variável de ambiente ou `--local`), acelerando o _setup_ de novos colaboradores e de pipelines CI/CD.
+4. **Auditoria e governança** — cada alteração em um dataset é um _commit_ rastreável (autor, _timestamp_, mensagem, diff de _hash_), respondendo de forma inequívoca à pergunta "quais dados treinaram o modelo em produção em uma data X?".
+5. **Custo zero e integração nativa** — DagsHub oferece _bucket_ S3-compatible e MLflow Tracking hospedado gratuitamente para projetos públicos, eliminando a necessidade de subir MinIO ou MLflow Server próprio.
+
+#### Arquitetura do Versionamento
+
+```
+┌─────────────────┐    metadados (.dvc)    ┌──────────────┐
+│  GitHub (código)│◄──────────────────────►│ DagsHub Repo │
+└─────────────────┘                        └──────┬───────┘
+                                                    │ dados binários (S3)
+                                                    │ métricas (MLflow)
+                                                    ▼
+                                             ┌──────────────┐
+                                             │  DagsHub ML  │
+                                             │  + Storage   │
+                                             └──────────────┘
+```
+
+#### Estágios do Pipeline (`dvc.yaml`)
+
+| Stage | Script | Saída | Shape |
+|-------|--------|-------|-------|
+| `prepare` | `src/data_preparation.py` | `data/processed/interactions.parquet` | 99.785 × 10 |
+| `featurize` | `src/feature_engineering.py` | `data/processed/interactions_fe.parquet` | 99.785 × 42 |
+| `validate` | _inline_ | validação de shape | (99.785, 42) |
+
+#### Fluxo Operacional Padronizado
+
+```bash
+# Autenticação local (uma vez por máquina — credencial NÃO vai para o Git)
+uv run dvc remote modify --local origin auth basic
+uv run dvc remote modify --local origin user <usuario_dagshub>
+uv run dvc remote modify --local origin password <token_dagshub>
+
+# Rastrear datasets ou modelos
+uv run dvc add data/novo_dataset.csv          # ou models/novo_modelo.pt
+
+# Versionar os metadados resultantes no Git
+git add data/novo_dataset.csv.dvc data/.gitignore
+git commit -m "feat: rastreia novo dataset/modelo"
+
+# Subir os binários para o DagsHub
+uv run dvc push
+
+# Em outra máquina (clone novo)
+uv run dvc pull
+```
+
+#### Migração do Pipeline Anterior (Google Drive → DagsHub)
+
+O projeto utilizava Google Drive com Service Account como _remote_. A migração foi executada no _commit_ `e1d3d7c` e está documentada em [`docs/GUIA_UPLOAD_DVC.md`](GUIA_UPLOAD_DVC.md). Os motivadores foram: eliminação de credenciais locais, remoção da dependência `dvc-gdrive`, resolução definitiva do erro de cota e integração nativa com o MLflow já hospedado no DagsHub.
+
 ---
 
 ## 7. Etapa 5 — Feature Engineering
@@ -714,3 +793,69 @@ Lift vs baseline: 0.2740 / 0.0045 = **60.9x** (Production reporta 60.6x — mesm
 
 ### Dashboard
 *   [Dashboard Streamlit (front/app_vis.py)](../front/app_vis.py)
+
+---
+
+## 15. Versionamento de Modelos via DVC (2026-07-10)
+
+Em continuidade à consolidação do pipeline MLOps descrita na seção 6.5, foi executada em **10 de julho de 2026** a primeira operação de versionamento de modelos via DVC. O objetivo central é atrelar o modelo de produção e seu pré-processamento aos mesmos _hashes_ imutáveis que regem o versionamento dos datasets, eliminando a lacuna histórica em que apenas o MLflow guardava o binário do modelo Production.
+
+### 15.1 Escopo da Operação
+
+Os seguintes artefatos foram movidos de `artifacts/` para `models/`, renomeados para eliminar a ambiguidade entre o arquivo genérico e o modelo canônico registrado no MLflow Model Registry:
+
+| Origem | Destino | Tamanho | MD5 |
+|---|---|---|---|
+| `artifacts/ncf_final.pt` | `models/ncf_production.pt` | 16.112.433 bytes | `439244cc81273d4bbc0bfa710a9142ee` |
+| `artifacts/scaler.pkl` | `models/scaler_production.pkl` | 1.655 bytes | `cc452c48be733553d03baa2856227380` |
+
+> O arquivo `artifacts/ncf_Ablation_FINAL_no_aux_emb32.pt` foi descartado propositadamente: a comparação `md5sum` demonstrou tratar-se de cópia literal do `ncf_final.pt` (mesmo hash), e o modelo canônico Production já está identificado pelo registro do MLflow.
+
+### 15.2 Ajustes no `.gitignore`
+
+A regra preexistente `models/*` ignorava todo o diretório, incluindo os arquivos `.dvc` que precisam ser versionados no Git. Duas exceções foram adicionadas para permitir o versionamento dos metadados sem reintroduzir os binários:
+
+```gitignore
+models/*
+!models/.gitkeep
+!models/*.dvc
+!models/.gitignore
+```
+
+### 15.3 Commits Aplicados
+
+| Hash Curto | Mensagem |
+|---|---|
+| `cf6f400` | `chore: permite versionar modelos .dvc em models/` |
+| `ce335bc` | `feat: versiona modelo NCF Production e scaler via DVC` |
+
+### 15.4 Estado do Push para o DagsHub
+
+A operação de `dvc push` foi executada, porém **bloqueada pelo DagsHub com `403 Forbidden`**. A investigação confirmou que:
+
+* O token configurado autentica corretamente — `dvc pull` e `dvc status -c` operam normalmente (leitura liberada).
+* A conta não possui permissão de escrita (`Write`/`Admin`) no repositório `deniscelclaro/projeto_fiap_modulo2`.
+
+#### Pendência e Plano de Resolução
+
+Ação requerida ao **owner do repositório (Denis)**:
+
+1. Acessar `https://dagshub.com/deniscelclaro/projeto_fiap_modulo2/settings/collaborators`.
+2. Adicionar o colaborador com role **Write** ou **Admin**.
+3. Re-executar, após a concessão:
+   ```bash
+   uv run dvc push models/ncf_production.pt.dvc models/scaler_production.pkl.dvc
+   ```
+
+O estado do `dvc status -c` valida a conclusão da operação — os modelos deixarão de aparecer como `new` quando o _push_ for bem-sucedido. Nenhum trabalho foi perdido: os binários permanecem localmente em `models/` e os metadados já estão versionados no Git, aguardando apenas a liberação de escrita no DagsHub para concluírem a sincronização.
+
+### 15.5 Impacto na Reprodutibilidade
+
+Com a operação concluída (assim que o _push_ for liberado), o pipeline atinge reprodutibilidade ponta a ponta: ao executar
+
+```bash
+git checkout <commit-do-modelo-production>
+uv run dvc pull
+```
+
+qualquer colaborador obterá **exatamente** o mesmo binário `ncf_production.pt` que gerou as métricas `NDCG@10 = 0.2725` registradas no MLflow, eliminando a ambiguidade entre "modelo que está na minha máquina" e "modelo que está na sua máquina".
