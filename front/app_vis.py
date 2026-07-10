@@ -1212,7 +1212,15 @@ if _ncf_available:
 # ============================================================================
 # ABA 5 — RECOMENDAÇÕES (CONDICIONAL)
 # ============================================================================
-baseline_tab_idx = 3 if len(tabs) > 4 else None
+# Calcula o índice dinamicamente: a aba "Recomendações" fica imediatamente
+# após a aba do NCF (que pode ou não existir), e antes de Versionamento.
+baseline_tab_idx = None
+if df_baseline is not None and not df_baseline.empty:
+    # Posição: apos Visao Geral + FE + Baselines + (NCF opcional) = 3 ou 4
+    baseline_tab_idx = 4 if _ncf_available else 3
+    # Validacao defensiva: se o indice estourar, nao renderiza
+    if baseline_tab_idx >= len(tabs):
+        baseline_tab_idx = None
 if baseline_tab_idx is not None:
     with tabs[baseline_tab_idx]:
         st.header("🎯 Recomendações Geradas pelos Baselines")
