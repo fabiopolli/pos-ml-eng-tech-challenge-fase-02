@@ -246,6 +246,7 @@ def main() -> None:
         run_name = f"NCF_emb{args.emb_dim}_h{'-'.join(map(str, args.hidden))}_d{args.dropout}"
     best_ndcg = -1.0
     patience_counter = 0
+    best_state: dict | None = None
 
     mlflow_ctx = (
         __import__("mlflow").start_run(run_name=run_name)
@@ -305,8 +306,10 @@ def main() -> None:
                         print(f"    Early stopping na epoch {epoch}")
                         break
 
-        # Restaurar melhor modelo
-        if "best_state" in dir():
+        # Restaurar melhor modelo (best_state é None se nenhuma avaliação de validação rodou,
+        # ex.: --epochs 1, onde a condição `epoch % 2 == 0 or epoch == args.epochs` é True,
+        # mas mesmo assim queremos manter o estado atual do modelo nesse caso).
+        if best_state is not None:
             model.load_state_dict(best_state)
 
         # Avaliação final no teste

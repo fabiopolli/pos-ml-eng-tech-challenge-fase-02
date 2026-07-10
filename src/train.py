@@ -19,6 +19,7 @@ from sklearn.decomposition import TruncatedSVD
 from sklearn.metrics.pairwise import cosine_similarity
 
 from src.config import settings
+from src.data.splits import temporal_split as _temporal_split_with_asserts
 
 # Configuração do MLflow
 MLFLOW_AVAILABLE = False
@@ -49,33 +50,24 @@ def temporal_split(
     train_ratio: float = 0.70,
     val_ratio: float = 0.15,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Wrapper sobre `src.data.splits.temporal_split` com assertions anti-leakage.
+
+    Mantém a assinatura original (compatibilidade com chamadas em `src/train.py`)
+    mas delega a implementação para a versão em `src/data/splits.py`, que inclui
+    assertions rigorosas contra data leakage temporal.
     """
-    Realiza split temporal do dataset.
-
-    Args:
-        df: DataFrame com os dados
-        time_col: Nome da coluna de timestamp
-        train_ratio: Proporção para treino
-        val_ratio: Proporção para validação
-
-    Returns:
-        Tuple de (train, val, test) DataFrames
-    """
-    df_sorted = df.sort_values(by=time_col).reset_index(drop=True)
-    n = len(df_sorted)
-
-    train_end = int(n * train_ratio)
-    val_end = int(n * (train_ratio + val_ratio))
-
-    train_df = df_sorted.iloc[:train_end].copy()
-    val_df = df_sorted.iloc[train_end:val_end].copy()
-    test_df = df_sorted.iloc[val_end:].copy()
-
-    logger.info(f"Temporal Split: Train={len(train_df)}, Val={len(val_df)}, Test={len(test_df)}")
+    train_df, val_df, test_df = _temporal_split_with_asserts(
+        df,
+        time_col=time_col,
+        train_size=train_ratio,
+        val_size=val_ratio,
+    )
+    logger.info(
+        f"Temporal Split: Train={len(train_df)}, Val={len(val_df)}, Test={len(test_df)}"
+    )
     logger.info(f"  Treino: {train_df[time_col].min()} -> {train_df[time_col].max()}")
     logger.info(f"  Validação: {val_df[time_col].min()} -> {val_df[time_col].max()}")
     logger.info(f"  Teste: {test_df[time_col].min()} -> {test_df[time_col].max()}")
-
     return train_df, val_df, test_df
 
 

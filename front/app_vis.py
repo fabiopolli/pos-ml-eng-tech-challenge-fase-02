@@ -93,10 +93,10 @@ with st.sidebar:
     )
     st.markdown("---")
     st.markdown("### 🔗 Links Úteis")
-    st.markdown(f"[📦 Repositório GitHub](https://github.com/fabiopolli/pos-ml-eng-tech-challenge-fase-02)")
+    st.markdown("[📦 Repositório GitHub](https://github.com/fabiopolli/pos-ml-eng-tech-challenge-fase-02)")
     st.markdown(f"[🏔️ DagsHub Repo]({DAGSHUB_REPO_URL})")
     st.markdown(f"[🏆 Modelo Production (MLflow)]({DAGSHUB_MLFLOW_URL})")
-    st.markdown(f"[📖 REPORT.md](https://github.com/fabiopolli/pos-ml-eng-tech-challenge-fase-02/blob/main/docs/REPORT.md)")
+    st.markdown("[📖 REPORT.md](https://github.com/fabiopolli/pos-ml-eng-tech-challenge-fase-02/blob/main/docs/REPORT.md)")
     st.markdown("---")
     st.caption(f"🔖 Modelo MD5: `{PRODUCTION_MODEL_HASH[:8]}...`")
 
@@ -670,16 +670,16 @@ with tabs[2]:
         # KPIs de Split
         st.subheader("📊 Configuração do Split Temporal")
         col_split1, col_split2, col_split3, col_split4 = st.columns(4)
-        
+
         if train_df is not None and test_df is not None:
             col_split1.metric("Treino", f"{len(train_df):,} registros")
             col_split2.metric("Teste", f"{len(test_df):,} registros")
-            
+
             if "order_purchase_timestamp" in train_df.columns:
                 train_min = pd.to_datetime(train_df["order_purchase_timestamp"]).min().strftime("%Y-%m")
                 train_max = pd.to_datetime(train_df["order_purchase_timestamp"]).max().strftime("%Y-%m")
                 col_split3.metric("Período Treino", f"{train_min} → {train_max}")
-            
+
             if "order_purchase_timestamp" in test_df.columns:
                 test_min = pd.to_datetime(test_df["order_purchase_timestamp"]).min().strftime("%Y-%m")
                 test_max = pd.to_datetime(test_df["order_purchase_timestamp"]).max().strftime("%Y-%m")
@@ -721,36 +721,36 @@ with tabs[2]:
 
         # Tabela de Resultados Completa
         st.subheader("📋 Tabela de Resultados — Todas as Métricas")
-        
+
         # Preparar dados para exibição
         display_results = df_results.copy()
         display_results["model_k"] = display_results["model"] + " K=" + display_results["k"].astype(str)
         if "min_reviews" in display_results.columns:
             display_results.loc[display_results["min_reviews"] > 0, "model_k"] += " (min=" + \
                 display_results.loc[display_results["min_reviews"] > 0, "min_reviews"].astype(str) + ")"
-        
+
         # Selecionar colunas principais
         cols_show = ["model_k", "map_10", "ndcg_10", "precision_10", "recall_10", "hitrate_10"]
         cols_show = [c for c in cols_show if c in display_results.columns]
-        
+
         results_table = display_results[cols_show].copy()
         results_table.columns = ["Modelo", "MAP@10", "NDCG@10", "Precision@10", "Recall@10", "HitRate@10"]
         results_table = results_table.round(4)
-        
+
         st.dataframe(results_table, use_container_width=True)
 
         st.markdown("---")
 
         # Gráfico 1: Comparação de MAP@10 entre modelos
         st.subheader("📈 Comparação de MAP@10 por Modelo")
-        
+
         # Filtrar apenas modelos com K=10 para comparação justa
         k10_results = df_results[df_results["k"] == 10].copy()
         k10_results["model_label"] = k10_results.apply(
             lambda x: f"{x['model']}" + (f" (min={int(x['min_reviews'])})" if x.get("min_reviews", 0) > 0 else ""),
             axis=1
         )
-        
+
         fig = px.bar(
             k10_results,
             x="model_label",
@@ -768,19 +768,19 @@ with tabs[2]:
         # Gráfico 2: Popularity Baseline - Métricas por K
         st.markdown("---")
         st.subheader("📊 Popularity Baseline — Evolução por K")
-        
+
         pop_results = df_results[df_results["model"] == "PopularityBaseline"].copy()
         if not pop_results.empty:
             metrics_for_k = ["map_10", "ndcg_10", "hitrate_10"]
             metric_labels = {"map_10": "MAP@10", "ndcg_10": "NDCG@10", "hitrate_10": "HitRate@10"}
-            
+
             k_metrics = pop_results[["k"] + metrics_for_k].melt(
-                id_vars="k", 
-                var_name="métrica", 
+                id_vars="k",
+                var_name="métrica",
                 value_name="valor"
             )
             k_metrics["métrica"] = k_metrics["métrica"].map(metric_labels)
-            
+
             fig = px.line(
                 k_metrics,
                 x="k",
@@ -798,33 +798,33 @@ with tabs[2]:
         # Gráfico 3: Comparação de todas as métricas principais
         st.markdown("---")
         st.subheader("🎯 Comparação Completa de Métricas (K=10)")
-        
+
         # Preparar dados para radar chart
         metrics_compare = ["map_10", "ndcg_10", "recall_10", "hitrate_10"]
         model_compare = df_results[df_results["k"] == 10][["model", "min_reviews"] + metrics_compare].copy()
-        
+
         if not model_compare.empty:
             # Radar chart
             categories = ["MAP@10", "NDCG@10", "Recall@10", "HitRate@10"]
-            
+
             fig = go.Figure()
             colors = {"PopularityBaseline": "#58a6ff", "TopRatedBaseline": "#3fb950", "ItemItemCF": "#f0883e"}
-            
+
             for _, row in model_compare.iterrows():
                 values = [row[m] for m in metrics_compare]
                 label = row["model"]
                 if row.get("min_reviews", 0) > 0:
                     label += f" (min={int(row['min_reviews'])})"
-                
+
                 fig.add_trace(go.Scatterpolar(
                     r=values + [values[0]],  # Fechar o polígono
                     theta=categories + [categories[0]],
                     fill='toself',
-                    fillcolor=f"rgba(88, 166, 255, 0.2)",
+                    fillcolor="rgba(88, 166, 255, 0.2)",
                     line=dict(color=colors.get(row["model"], "#58a6ff"), width=2),
                     name=label,
                 ))
-            
+
             fig.update_layout(
                 polar=dict(
                     radialaxis=dict(
@@ -841,7 +841,7 @@ with tabs[2]:
         # Análise dos Resultados
         st.markdown("---")
         st.subheader("🔍 Análise dos Resultados")
-        
+
         # Explicação dos resultados zero
         st.markdown(
             """
@@ -1287,10 +1287,10 @@ if baseline_tab_idx is not None:
 # ============================================================================
 # ABA 6 — VERSIONAMENTO (DagsHub + DVC + MLflow)
 # ============================================================================
-versioning_tab_idx = (
-    3 if _ncf_available else 2 + (1 if df_baseline is not None else 0)
-) + (0 if _ncf_available else 0)
-# Simplifica: pega a aba imediatamente antes da final
+# ABA DE VERSIONAMENTO (GitHub + DVC + MLflow + DagsHub)
+# ============================================================================
+# Posição: imediatamente antes da aba final ("Sobre o Pipeline" no modo padrão,
+# ou da última aba no modo apresentação).
 final_tab_idx = len(tabs) - 1
 versioning_tab_idx = final_tab_idx - (0 if presentation_mode else 1)
 

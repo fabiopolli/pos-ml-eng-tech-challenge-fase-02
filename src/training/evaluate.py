@@ -20,21 +20,6 @@ _AUX_COLS = [
 ]
 
 
-def _build_item_lookup(df: pd.DataFrame, aux_cols: list[str]) -> dict[int, np.ndarray]:
-    """Lookup por product_id_idx -> (categoria, vetor aux).
-
-    Para itens com múltiplas linhas, pega a primeira ocorrência.
-    """
-    lookup: dict[int, np.ndarray] = {}
-    cat_lookup: dict[int, int] = {}
-    df_unique = df.drop_duplicates(subset=["product_id_idx"], keep="first")
-    for _, row in df_unique.iterrows():
-        item_id = int(row["product_id_idx"])
-        cat_lookup[item_id] = int(row["category_id"])
-        lookup[item_id] = row[aux_cols].values.astype(np.float32)
-    return cat_lookup, lookup
-
-
 def calculate_metrics_at_k(
     recommended_list: np.ndarray,
     true_items_set: set,
