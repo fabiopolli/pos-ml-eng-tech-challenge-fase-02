@@ -1,0 +1,5 @@
+outs:
+- md5: cc452c48be733553d03baa2856227380
+  size: 1655
+  hash: md5
+  path: scaler_production.pkl

@@ -1,0 +1,5 @@
+outs:
+- md5: 439244cc81273d4bbc0bfa710a9142ee
+  size: 16112433
+  hash: md5
+  path: ncf_production.pt
