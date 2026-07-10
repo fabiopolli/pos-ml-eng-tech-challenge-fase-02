@@ -831,27 +831,27 @@ models/*
 
 ### 15.4 Estado do Push para o DagsHub
 
-A operação de `dvc push` foi executada, porém **bloqueada pelo DagsHub com `403 Forbidden`**. A investigação confirmou que:
+A primeira tentativa de `dvc push` foi bloqueada pelo DagsHub com `403 Forbidden`. A investigação confirmou que:
 
-* O token configurado autentica corretamente — `dvc pull` e `dvc status -c` operam normalmente (leitura liberada).
-* A conta não possui permissão de escrita (`Write`/`Admin`) no repositório `deniscelclaro/projeto_fiap_modulo2`.
+* O token configurado autentica corretamente — `dvc pull` e `dvc status -c` operavam normalmente (leitura liberada).
+* A conta não possuía permissão de escrita (`Write`/`Admin`) no repositório `deniscelclaro/projeto_fiap_modulo2`.
 
-#### Pendência e Plano de Resolução
+#### Resolução em 2026-07-10
 
-Ação requerida ao **owner do repositório (Denis)**:
+Após a concessão de permissão de escrita pelo owner do repositório (Denis), a operação de `dvc push` foi reexecutada com sucesso:
 
-1. Acessar `https://dagshub.com/deniscelclaro/projeto_fiap_modulo2/settings/collaborators`.
-2. Adicionar o colaborador com role **Write** ou **Admin**.
-3. Re-executar, após a concessão:
-   ```bash
-   uv run dvc push models/ncf_production.pt.dvc models/scaler_production.pkl.dvc
-   ```
+```bash
+$ uv run dvc push models/ncf_production.pt.dvc models/scaler_production.pkl.dvc
+Collecting                                           |0.00 [00:00,    ?entry/s]
+Pushing
+2 files pushed
+```
 
-O estado do `dvc status -c` valida a conclusão da operação — os modelos deixarão de aparecer como `new` quando o _push_ for bem-sucedido. Nenhum trabalho foi perdido: os binários permanecem localmente em `models/` e os metadados já estão versionados no Git, aguardando apenas a liberação de escrita no DagsHub para concluírem a sincronização.
+O `dvc status -c` deixou de listar `models/ncf_production.pt` e `models/scaler_production.pkl` como `new`, confirmando a sincronização completa dos binários com o _bucket_ DagsHub. O modelo de produção encontra-se agora **reprodutível a partir do estado versionado**: qualquer clone do repositório + `dvc pull` recupera exatamente o mesmo `ncf_production.pt` (MD5 `439244cc81273d4bbc0bfa710a9142ee`, 16.112.433 bytes) que originou as métricas `NDCG@10 = 0.2725` registradas no MLflow.
 
 ### 15.5 Impacto na Reprodutibilidade
 
-Com a operação concluída (assim que o _push_ for liberado), o pipeline atinge reprodutibilidade ponta a ponta: ao executar
+Com o _push_ concluído em 2026-07-10, o pipeline atinge **reprodutibilidade ponta a ponta**: ao executar
 
 ```bash
 git checkout <commit-do-modelo-production>
