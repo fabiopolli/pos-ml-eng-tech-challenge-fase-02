@@ -155,6 +155,98 @@ uv run dvc dag       # Visualizar grafo do pipeline
 
 ---
 
+## 🗃️ Sobre o DVC e Por Que o Escolhemos
+
+### O que é o DVC
+
+**DVC (Data Version Control)** é uma ferramenta open-source que estende o Git para versionar **dados** e **modelos** de Machine Learning. Ele segue o princípio de "Git para código, DVC para dados":
+
+- **Git** versiona código, scripts e metadados pequenos (`.dvc`, `dvc.lock`).
+- **DVC** versiona dados binários (CSVs, parquets, pesos de modelo) em **remote storage**, registrando apenas **hashes e referências** no Git.
+
+Isso resolve um problema clássico de MLOps: **Git não foi feito para versionar arquivos de centenas de MB**.
+
+### Por Que Adotamos DVC Neste Projeto
+
+A decisão foi tomada após avaliar quatro alternativas:
+
+| Alternativa | Veredito | Motivo |
+|-------------|----------|--------|
+| **Versionar CSVs direto no Git** | ❌ Rejeitado | Git LFS tem custo, limite de banda; arquivos grandes poluem o histórico. |
+| **Google Drive / S3 manual** | ❌ Rejeitado | Sem versionamento real (cada upload sobrescreve); sem rastreabilidade de qual CSV gerou qual modelo. |
+| **LakeFS / Delta Lake** | ❌ Rejeitado | Over-engineering para o escopo do Tech Challenge; exige infra dedicada. |
+| **DVC + DagsHub** | ✅ **Escolhido** | Versionamento real, reprodutibilidade ponta-a-ponta, e zero atrito com o restante do pipeline MLOps. |
+
+Os cinco motivos decisivos:
+
+1. **Reprodutibilidade experimental ponta-a-ponta**
+   Cada experimento no MLflow está vinculado a um **commit Git** + **hash DVC**. Conseguimos reconstruir qualquer modelo Production a partir do estado exato dos dados e do código.
+
+2. **Separação clara de responsabilidades**
+   - GitHub → código, scripts, configs, documentação.
+   - DagsHub → dados brutos, datasets processados, artefatos pesados.
+   - MLflow (também no DagsHub) → métricas, hiperparâmetros, modelos serializados.
+   Isso forma uma tríade MLOps coesa, **tudo na mesma plataforma**.
+
+3. **Colaboração sem fricção de credenciais**
+   Antes, o remote era Google Drive via Service Account JSON — exigia arquivo de chave local, plugin `dvc-gdrive` e permissão em Shared Drive. O DagsHub autentica via **token pessoal** (variável de ambiente ou `--local`), simplificando o onboarding de novos colaboradores e o setup em CI/CD.
+
+4. **Auditoria e governança**
+   Cada mudança em um dataset é um **commit rastreável**: autor, timestamp, mensagem, diff de hash. Essencial para responder perguntas como *"quais dados treinaram o modelo em produção em 2026-06-15?"*.
+
+5. **Custo zero e integração nativa**
+   O DagsHub oferece bucket S3-compatible + MLflow Tracking hospedado **gratuitamente** para projetos públicos. Não há custo de infraestrutura e elimina a necessidade de subir MinIO, MLflow Server próprio, etc.
+
+### Arquitetura Atual (DagsHub)
+
+```
+┌─────────────────┐    metadados (.dvc)    ┌──────────────┐
+│  GitHub (código)│◄──────────────────────►│ DagsHub Repo │
+└─────────────────┘                        └──────┬───────┘
+                                                    │ dados binários (S3)
+                                                    │ métricas (MLflow)
+                                                    ▼
+                                             ┌──────────────┐
+                                             │  DagsHub ML  │
+                                             │  + Storage   │
+                                             └──────────────┘
+```
+
+Configuração atual em [`.dvc/config`](.dvc/config):
+
+```ini
+[core]
+    no_scm = true
+    remote = origin
+['remote "origin"']
+    url = https://dagshub.com/deniscelclaro/projeto_fiap_modulo2.dvc
+```
+
+> **`no_scm = true`** indica que o DVC **não usa o Git para versionar os dados** — ele apenas registra o arquivo `.dvc` no Git, enquanto o conteúdo binário vai para o DagsHub. Isso evita conflitos entre as duas ferramentas.
+
+### Workflow Operacional
+
+```bash
+# Primeira vez (autenticação local)
+uv run dvc remote modify --local origin auth basic
+uv run dvc remote modify --local origin user <usuario>
+uv run dvc remote modify --local origin password <token>
+
+# Rastrear dados novos
+uv run dvc add data/novo_dataset.csv
+
+# Versionar metadados no Git
+git add data/novo_dataset.csv.dvc data/.gitignore
+git commit -m "feat: rastreia novo dataset"
+
+# Subir dados para o DagsHub
+uv run dvc push
+```
+
+Para um guia operacional completo, consulte [`docs/GUIA_UPLOAD_DVC.md`](docs/GUIA_UPLOAD_DVC.md).
+
+---
+
 ## ⏳ Por que Split Temporal (e não Aleatório)?
 
 O pipeline de recomendação adota **split temporal 70/15/15** (ordenado por `order_purchase_timestamp` → `days_since_reference`) em vez do split aleatório clássico de ML. Esta decisão é **deliberada** e fundamentada em três razões:
