@@ -859,3 +859,72 @@ uv run dvc pull
 ```
 
 qualquer colaborador obterá **exatamente** o mesmo binário `ncf_production.pt` que gerou as métricas `NDCG@10 = 0.2725` registradas no MLflow, eliminando a ambiguidade entre "modelo que está na minha máquina" e "modelo que está na sua máquina".
+
+---
+
+## 16. Registro de Modelo no MLflow Tracking do DagsHub (2026-07-10)
+
+Complementarmente à Rota A (DVC), a Rota B foi executada em **10 de julho de 2026** com o objetivo de registrar o modelo de produção no **Model Registry** hospedado no MLflow Tracking do DagsHub, habilitando governança de versões (Staging / Production / Archived) e integração direta com o restante do pipeline MLOps.
+
+### 16.1 Decisão Arquitetural
+
+A escolha do **DagsHub** como _tracking server_ se apoia em três argumentos já consolidados na seção 6.5 deste relatório:
+
+* **Unificação** — o mesmo DagsHub hospeda Git, _bucket_ S3-compatible e MLflow Tracking, eliminando fragmentação entre provedores.
+* **Custo zero** — o MLflow Tracking é oferecido gratuitamente para projetos públicos.
+* **Autenticação única** — o token pessoal já configurado em `.dvc/config.local` para acesso ao DVC é o mesmo utilizado pelo MLflow, simplificando credenciais.
+
+### 16.2 Script de Registro
+
+Foi criado o script [`scripts/register_model_dagshub.py`](../scripts/register_model_dagshub.py), responsável por:
+
+1. Carregar o `ncf_production.pt` (rastreado via DVC em `models/`).
+2. Reconstruir a arquitetura `NCFHybrid` com os hiperparâmetros canônicos do `configs/ncf_best.yaml` (emb_dim=32, cat_emb_dim=8, hidden=[64, 32], dropout=0.5, ablation no_aux=20).
+3. Conectar ao MLflow do DagsHub usando as credenciais lidas de `.dvc/config.local`.
+4. Criar (ou reutilizar) o experimento `Olist_NCF_Production_Transfer`.
+5. Logar hiperparâmetros, métricas canônicas do test set e os artefatos `scaler_production.pkl` e `ncf_best.yaml`.
+6. Registrar o modelo PyTorch (serialização `pickle`) no Model Registry como `olist-ncf-recommender`.
+7. Promover a versão recém-criada para o stage `Production`, arquivando versões anteriores se existirem.
+
+#### Notas Técnicas
+
+* O formato `pickle` foi escolhido em vez de `pt2` (traced graph) porque o segundo exige `input_example` para serialização. Como o objetivo deste registro é **governança** (não inferência servida), a serialização por pickle é suficiente e mais simples.
+* A arquitetura foi instanciada com `n_aux_features=20` porque o _checkpoint_ foi treinado com input_dim=92 (`emb_dim*2 + cat_emb_dim + 20 = 64 + 8 + 20`), apesar da _ablation_ no-aux zerar os valores durante o _forward_ — o _shape_ permanece 20.
+
+### 16.3 Resultado da Execução
+
+A execução do script em 2026-07-10 às 17:48 (UTC-3) produziu o seguinte estado no MLflow do DagsHub:
+
+| Campo | Valor |
+|---|---|
+| Tracking URI | `https://dagshub.com/deniscelclaro/projeto_fiap_modulo2.mlflow` |
+| Experimento | `Olist_NCF_Production_Transfer` (ID 1) |
+| Registered Model | `olist-ncf-recommender` |
+| Versão | 1 |
+| Stage | **Production** |
+| Run ID | `c65f5531564f45c583926c564985cc65` |
+| Source URI | `models:/m-eb4292e54f6e4ce78fc10800767c9a46` |
+
+A interface web está acessível em:
+```
+https://dagshub.com/deniscelclaro/projeto_fiap_modulo2/#/models/olist-ncf-recommender
+```
+
+### 16.4 Complementaridade entre Rota A e Rota B
+
+As duas rotas implementadas **não são concorrentes, mas complementares**, cada uma atendendo a um propósito distinto:
+
+| Aspecto | Rota A (DVC) | Rota B (MLflow) |
+|---|---|---|
+| Foco | **Reprodutibilidade científica** | **Governança de modelos** |
+| O que versiona | _Binários_ brutos (estado da rede, scaler) | _Modelo registrado_ com metadados, métricas e linhagem |
+| Identificação | Hash MD5 do conteúdo | Versão sequencial (v1, v2, ...) + stage |
+| Auditoria | `git log` + `dvc status` | UI do MLflow com filtros por estágio |
+| Governança de promoção | Manual via DVC YAML | Stages nativos (Staging → Production → Archived) |
+| Integração com deploy | `dvc pull` em CI/CD | `mlflow models serve` ou `mlflow.pyfunc.load_model` |
+
+### 16.5 Próximos Passos Recomendados
+
+1. **Migrar todos os treinamentos** para usar o DagsHub MLflow como _backend_ de _tracking_, em vez do SQLite local (`artifacts/mlflow.db`).
+2. Configurar `MLFLOW_TRACKING_URI` em `src/config.py` para apontar ao DagsHub por padrão, mantendo o SQLite como _fallback_ opcional.
+3. Adicionar este registro à `project_memory.md` para que o time saiba que o modelo Production agora vive oficialmente em ambos os sistemas (DVC para reprodutibilidade, MLflow para governança).
