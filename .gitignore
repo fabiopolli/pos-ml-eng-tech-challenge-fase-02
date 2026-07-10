@@ -77,6 +77,8 @@ data/processed/*
 data/*.csv
 models/*
 !models/.gitkeep
+!models/*.dvc
+!models/.gitignore
 
 # Large files
 *.parquet
