@@ -52,7 +52,7 @@ Parece muito. Mas tem uma armadilha que descobrimos na EDA e que **guiou todas a
 
 ## ⏱️ 0:25 → 1:05 (40 s) — TASK
 
-👁️ Scroll curto para **"Sparsity da Matriz User-Item"** (3 métricas grandes).
+👁️ Scroll curto para **"Sparsity da Matriz User-Item"**: 3 KPIs grandes + **gráfico-donut** lado a lado com a mensagem **"98% cold-start"** no centro.
 
 🎯 **STAR:** TASK (o verdadeiro problema a resolver)
 
@@ -65,9 +65,11 @@ Vou dar um número concreto:
 
 Na prática, estamos trabalhando com **2 mil clientes relevantes** em um mar de 93 mil.
 
+Olhem o gráfico-donut aqui ao lado: **98% em vermelho** (1 compra só) e **2% em verde** (≥2 compras, com histórico).
+
 Isso muda tudo. Qualquer feature que dependa de histórico do cliente — gasto médio, categorias preferidas — está **vazia** para 98% deles. É como pedir dica de restaurante para quem acabou de chegar na cidade: não há histórico para usar."
 
-💡 Pausar 1 s após "98% dos clientes compraram UMA ÚNICA vez". Deixar a ficha cair.
+💡 Pausar 1 s após "98% dos clientes compraram UMA ÚNICA vez". Deixar a ficha cair. Apontar para o donut.
 
 ---
 
@@ -93,11 +95,13 @@ Essas decisões estão refletidas no pipeline e no dashboard que demonstraremos 
 
 ## ⏱️ 1:35 → 2:00 (25 s) — RESULT
 
-👁️ Voltar o olhar para a câmera. Gesticular de leve em direção ao dashboard sem clicar.
+👁️ Trocar para a aba **🧠 NCF (MLP PyTorch)**. Apontar para o **banner hero** gigante no topo (gradiente azul + fonte 3.5em + badge `↑ 60.6x vs baseline`).
 
 🎯 **STAR:** RESULT (resultado concreto + honestidade sobre o teto)
 
 🗣️ "Resultado dessas decisões: o modelo final de Neural Collaborative Filtering atingiu **NDCG@10 = 0,2725** — **60× melhor que o baseline** mais forte (Popularidade, 0,0045).
+
+Olhem este banner aqui em cima, com o **número grande** e o badge **`↑ 60.6x vs baseline`**. Ele já deixa claro qual é o resultado, sem precisar fazer a conta na hora.
 
 Mas serei honesto: **0,27 é modesto** em termos absolutos. Em datasets densos como MovieLens, o esperado é 0,4 a 0,6. A marca do dataset fraco continua lá.
 
@@ -109,12 +113,24 @@ Por isso, ao longo da demonstração do dashboard, vamos mostrar **a jornada té
 
 ## 📋 Resumo visual do STAR
 
-| Fase      | Tempo     | Mensagem central                                    |
-| --------- | --------- | --------------------------------------------------- |
-| Situation | 0:00–0:25 | "Problema: recomendar produtos no Olist"            |
-| Task      | 0:25–1:05 | "Sparsity 99,99% + 98% cold-start = desafio real"   |
-| Action    | 1:05–1:35 | "3 decisões: implícito + log + embeddings primeiro" |
-| Result    | 1:35–2:00 | "NDCG 0,27 = 60× baseline;局限 do dataset"          |
+| Fase      | Tempo     | Mensagem central                                    | Referência visual no painel |
+| --------- | --------- | --------------------------------------------------- | --------------------------- |
+| Situation | 0:00–0:25 | "Problema: recomendar produtos no Olist"            | 4 KPIs principais (topo) |
+| Task      | 0:25–1:05 | "Sparsity 99,99% + 98% cold-start = desafio real"   | Bloco "Sparsity" + **donut** 98% |
+| Action    | 1:05–1:35 | "3 decisões: implícito + log + embeddings primeiro" | Sem UI (fala para câmera) |
+| Result    | 1:35–2:00 | "NDCG 0,27 = 60× baseline;局限 do dataset"          | **Banner hero** (aba NCF) |
+
+---
+
+## 🎛️ Sidebar — Modo Apresentação (atalho útil)
+
+**Antes de iniciar a apresentação (10 segundos antes):**
+
+1. Clicar no ícone `>` no canto superior esquerdo do dashboard para abrir a **sidebar**.
+2. Ativar o toggle **🎤 Modo Apresentação**.
+3. Pronto: a aba `ℹ️ Sobre o Pipeline` desaparece automaticamente, deixando apenas as abas relevantes para a demo.
+
+💡 Por que isso importa: durante a apresentação, **menos é mais**. Esconder a aba técnica final reduz a chance de a banca navegar para algo que você não quer falar.
 
 ---
 
@@ -157,26 +173,26 @@ Quatro ferramentas, **quatro papéis distintos**, uma plataforma unificada."
 
 ## ⏱️ 2:25 → 2:50 (25 s) — Como o modelo de produção é versionado
 
-👁️ Mostrar: **commit `ce335bc` no GitHub** ("feat: versiona modelo NCF Production e scaler via DVC") e em seguida a página do **Model Registry no DagsHub** com `olist-ncf-recommender` v1 em stage Production.
+👁️ **Ativar o "🎤 Modo Apresentação"** na sidebar (toggle no canto esquerdo). Trocar para a aba **🔖 Versionamento** — ela já tem um card grande do Production Model com link clicável para o DagsHub, e blocos visuais `✅ DVC Sincronizado` e `✅ MLflow Registrado`.
 
 🎯 **Objetivo:** mostrar o fluxo ponta a ponta em 25 s.
 
-🗣️ "Na prática, o fluxo do nosso modelo Production tem **dois trilhos paralelos**:
+🗣️ "Na prática, o fluxo do nosso modelo Production tem **dois trilhos paralelos**, e o painel tem uma **aba dedicada** para isso (apontar):
 
 **Trilho 1 — DVC (reprodutibilidade científica):**
 1. Treinamos o NCF e salvamos `ncf_final.pt` localmente.
 2. Rodamos `dvc add`, que gera um `*.dvc` com o hash MD5 do arquivo.
 3. Damos `git commit` apenas dos metadados pequenos.
 4. `dvc push` envia o binário de 16 MB para o bucket S3 do DagsHub.
-5. Resultado: qualquer pessoa, em qualquer máquina, faz `git clone` + `dvc pull` e recebe **exatamente o mesmo modelo** — bit a bit.
+5. Resultado: qualquer pessoa, em qualquer máquina, faz `git clone` + `dvc pull` e recebe **exatamente o mesmo modelo** — bit a bit. *Olhem aqui embaixo, o MD5 é `439244cc...`, está visível na aba.*
 
 **Trilho 2 — MLflow (governança de modelos):**
 1. Rodamos `scripts/register_model_dagshub.py`.
 2. O modelo é logado como `olist-ncf-recommender` v1.
 3. Promovemos automaticamente para o stage **Production**.
-4. Resultado: histórico de versões, comparação entre runs e **auditoria** de quem promoveu o quê e quando."
+4. Resultado: histórico de versões, comparação entre runs e **auditoria** de quem promoveu o quê e quando. *E tem link clicável no card — clicar abre direto no DagsHub, na página do modelo em Production.*"
 
-💡 Apontar para a UI ao dizer "qualquer pessoa... recebe o mesmo modelo" — é o momento visualmente mais forte.
+💡 O destaque do momento: clicar no link `📦 Ver Model Registry no DagsHub` mostrando o `olist-ncf-recommender` v1 em Production. É quando a banca vê tudo conectado.
 
 ---
 
