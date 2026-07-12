@@ -7,6 +7,7 @@
 ![DVC](https://img.shields.io/badge/DVC-3.0+-945dd6)
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.0+-ff4b4b)
 ![License](https://img.shields.io/badge/license-MIT-green)
+[![DagsHub](https://img.shields.io/badge/DagsHub-projeto_fiap_modulo2-orange)](https://dagshub.com/deniscelclaro/projeto_fiap_modulo2)
 
 > Sistema de recomendação de produtos para e-commerce baseado no dataset público **Olist Brazilian E-Commerce**, implementando pipeline MLOps completo de treinamento, tracking, versionamento e deploy.
 
@@ -198,6 +199,8 @@ Os cinco motivos decisivos:
    O DagsHub oferece bucket S3-compatible + MLflow Tracking hospedado **gratuitamente** para projetos públicos. Não há custo de infraestrutura e elimina a necessidade de subir MinIO, MLflow Server próprio, etc.
 
 ### Arquitetura Atual (DagsHub)
+
+> 🔗 Repositório DagsHub: [deniscelclaro/projeto_fiap_modulo2](https://dagshub.com/deniscelclaro/projeto_fiap_modulo2)
 
 ```
 ┌─────────────────┐    metadados (.dvc)    ┌──────────────┐
