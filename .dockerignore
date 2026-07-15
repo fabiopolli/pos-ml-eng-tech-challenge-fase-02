@@ -9,3 +9,12 @@ __pycache__
 tests/
 .pre-commit-config.yaml
 README.md
+.dvc/
+.ipynb_checkpoints/
+*.parquet
+*.db
+
+# Pastas de Dados e Artefatos (Não jogue para dentro da imagem durante o build!)
+data/
+artifacts/
+models/

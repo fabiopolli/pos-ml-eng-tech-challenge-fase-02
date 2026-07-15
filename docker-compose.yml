@@ -1,5 +1,4 @@
 services:
-  # 1. Nossa API de Recomendação
   api:
     build: .
     container_name: olist_recommender_api
@@ -7,15 +6,23 @@ services:
       - "8000:8000"
     volumes:
       - ./artifacts:/app/artifacts
-    depends_on:
-      - mlflow
+      - ./src:/app/src
+      - ./data:/app/data
+      - ./models:/app/models
 
-  # 2. Servidor do MLflow para Tracking
-  mlflow:
+  streamlit:
     build: .
-    container_name: olist_mlflow_server
+    container_name: olist_streamlit_dashboard
     ports:
-      - "5000:5000"
+      - "8501:8501"
     volumes:
-      - ./artifacts:/app/artifacts
-    command: ["mlflow", "server", "--backend-store-uri", "sqlite:////app/artifacts/mlflow.db", "--host", "0.0.0.0", "--port", "5000"]
+      - ./front:/app/front          # O código do painel
+      - ./src:/app/src              # Os scripts e utilitários
+      - ./data:/app/data            # <-- A PONTE PARA O SEU PARQUET!
+      - ./artifacts:/app/artifacts  # <-- A PONTE PARA OS CSVS DOS BASELINES!
+      - ./models:/app/models        # <-- A PONTE PARA OS PESOS DO MODELO!
+    command: streamlit run front/app_vis.py
+    depends_on:
+      - api
+
+      

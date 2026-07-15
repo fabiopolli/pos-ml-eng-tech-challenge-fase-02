@@ -15,15 +15,18 @@ RUN pip install uv
 # 5. Copia os arquivos de configuração do projeto para dentro do container
 COPY pyproject.toml uv.lock README.md* ./
 
-# 6. Instala as dependências (Vai usar o cache do Docker se os arquivos acima não mudarem)
-RUN uv pip install --system fastapi uvicorn loguru torch pandas mlflow
+# 6. Instala o PyTorch versão CPU-only primeiro (economia drástica de ~8 GB!)
+RUN uv pip install --system torch --index-url https://download.pytorch.org/whl/cpu
 
-# 7. Copia o código-fonte da máquina para dentro do container
+# 7. Instala as demais dependências do backend e do frontend analítico
+RUN uv pip install --system fastapi uvicorn loguru pandas mlflow streamlit plotly seaborn matplotlib pyyaml scipy scikit-learn
+
+# 8. Copia o código-fonte da máquina para dentro do container
 COPY src/ /app/src/
 
-# 8. Expõe as portas que a API e o MLflow vão usar
+# 9. Expõe as portas que a API e o MLflow vão usar
 EXPOSE 8000
 EXPOSE 5000
 
-# 9. Comando de disparo da API usando o servidor web Uvicorn
+# 10. Comando de disparo da API usando o servidor web Uvicorn
 CMD ["uvicorn", "src.api:app", "--host", "0.0.0.0", "--port", "8000"]
